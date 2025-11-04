@@ -5,8 +5,34 @@ export type TStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'UNKNOWN'
 
 const POLL_BASE_MS = 2500;
 const POLL_MAX_MS = 10000;
-export const MAX_WAIT_MS = 120000;
+// Overridable via NEXT_PUBLIC_TRIPO_MAX_WAIT_MS (ms). Default: 5 minutes.
+export const MAX_WAIT_MS = Number(process.env.NEXT_PUBLIC_TRIPO_MAX_WAIT_MS || '') || 300000;
 const SUCCEEDED_EXTRA_RETRIES = 3;
+
+function getTripoErrorHint(code: number): string | null {
+  switch (code) {
+    case 1001:
+      return 'Solicitud inválida o parámetros malformados. Verifica "type", "model_version" y la estructura de "file"/"files".';
+    case 2000:
+      return 'Límite de generación alcanzado (rate limit). Intenta más tarde.';
+    case 2002:
+      return 'Tipo de tarea no soportado. Revisa el campo "type".';
+    case 2003:
+      return 'El archivo de entrada está vacío o fue bloqueado.';
+    case 2004:
+      return 'Tipo de archivo no soportado.';
+    case 2008:
+      return 'Contenido rechazado por la política.';
+    case 2010:
+      return 'Créditos insuficientes.';
+    case 2015:
+      return 'Versión de modelo deprecada. Usa una más reciente.';
+    case 2018:
+      return 'El modelo es demasiado complejo para remallar.';
+    default:
+      return null;
+  }
+}
 
 export function useTripoTask() {
   const [taskId, setTaskId] = useState<string | null>(null);
@@ -68,7 +94,16 @@ export function useTripoTask() {
         if (data.previewUrl) setPreviewUrl(data.previewUrl ?? null);
 
         if (st === 'FAILED') {
-          setError('La tarea falló en el servidor.');
+          const serverMsg = (data && (data.errorMessage || data.error || data.message)) || null;
+          const code = data && typeof data.errorCode !== 'undefined' ? data.errorCode : null;
+          let msg = serverMsg
+            ? `La tarea falló: ${serverMsg}${code !== null ? ` (código ${code})` : ''}`
+            : 'La tarea falló en el servidor.';
+          if (typeof code === 'number') {
+            const hint = getTripoErrorHint(code);
+            if (hint) msg += ` — ${hint}`;
+          }
+          setError(msg);
           stopPolling();
           return;
         }
@@ -129,11 +164,19 @@ export function useTripoTask() {
   );
 
   const createTask = useCallback(
-    async (prompt: string, imageUrl?: string): Promise<void> => {
+    async (
+      prompt: string,
+      opts?: { imageUrl?: string; imageFileToken?: string }
+    ): Promise<void> => {
       reset();
       setStatus('PENDING');
       const body: any = { prompt: prompt.trim() };
-      if (imageUrl && imageUrl.trim()) body.imageUrl = imageUrl.trim();
+
+      if (opts?.imageFileToken && opts.imageFileToken.trim()) {
+        body.imageFileToken = opts.imageFileToken.trim();
+      } else if (opts?.imageUrl && opts.imageUrl.trim()) {
+        body.imageUrl = opts.imageUrl.trim();
+      }
 
       const res = await fetch('/api/tripo/text-to-3d', {
         method: 'POST',

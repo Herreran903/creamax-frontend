@@ -3,6 +3,7 @@
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei';
 import { STLLoader, OBJLoader } from 'three-stdlib';
+import type { GLTF } from 'three-stdlib';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { cn } from '@/lib/utils';
@@ -128,6 +129,7 @@ function STLMesh({ url }: { url: string }) {
 
 export function ModelViewer({
   src,
+  object,
   overlayImage,
   onReady,
   className,
@@ -139,6 +141,7 @@ export function ModelViewer({
   preferOverlay = false,
 }: {
   src?: string;
+  object?: THREE.Group | GLTF | THREE.Object3D;
   overlayImage?: string;
   onReady?: () => void;
   className?: string;
@@ -150,11 +153,12 @@ export function ModelViewer({
   preferOverlay?: boolean;
 }) {
   const hasSrc = !!src;
+  const hasObject = !!object;
   const ext = src?.split('.').pop()?.toLowerCase();
   const [loadErr] = useState(false);
 
-  const showOverlay = !!overlayImage && (!hasSrc || preferOverlay);
-  const show3D = hasSrc && !preferOverlay && !loadErr;
+  const showOverlay = !!overlayImage && (!(hasSrc || hasObject) || preferOverlay);
+  const show3D = (hasSrc || hasObject) && !preferOverlay && !loadErr;
 
   return (
     <div
@@ -186,7 +190,15 @@ export function ModelViewer({
             {!disableSpin ? (
               <Spinning>
                 <NormalizeGroup>
-                  {ext === 'stl' ? (
+                  {hasObject ? (
+                    <primitive
+                      object={
+                        (object as GLTF & { scene?: THREE.Object3D }).scene ??
+                        (object as THREE.Object3D)
+                      }
+                      dispose={null}
+                    />
+                  ) : ext === 'stl' ? (
                     <STLMesh url={src!} />
                   ) : ext === 'obj' ? (
                     <OBJObject url={src!} />
@@ -197,7 +209,15 @@ export function ModelViewer({
               </Spinning>
             ) : (
               <NormalizeGroup>
-                {ext === 'stl' ? (
+                {hasObject ? (
+                  <primitive
+                    object={
+                      (object as GLTF & { scene?: THREE.Object3D }).scene ??
+                      (object as THREE.Object3D)
+                    }
+                    dispose={null}
+                  />
+                ) : ext === 'stl' ? (
                   <STLMesh url={src!} />
                 ) : ext === 'obj' ? (
                   <OBJObject url={src!} />

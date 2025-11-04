@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Home, Plus } from 'lucide-react';
+import { ActiveModelProvider } from '@/stores/active-model';
 
 const easeCreamax: [number, number, number, number] = [0.25, 0.1, 0.25, 1];
 
@@ -61,72 +62,74 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const r = useRouter();
 
   return (
-    <div className="min-h-screen font-sans text-foreground bg-background">
-      <motion.header
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0, transition: { duration: 0.35, ease: easeCreamax } }}
-        className="sticky top-0 z-40 flex items-center justify-between px-6 py-4 bg-background/70 backdrop-blur-sm border-b border-border isolate"
-      >
-        <motion.button
-          type="button"
-          onClick={() => r.push('/app')}
-          className="group inline-flex items-center gap-2 will-change-transform"
-          aria-label="Ir al inicio"
-          whileHover={{ y: -2 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
+    <ActiveModelProvider>
+      <div className="min-h-screen font-sans text-foreground bg-background">
+        <motion.header
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0, transition: { duration: 0.35, ease: easeCreamax } }}
+          className="sticky top-0 z-40 flex items-center justify-between px-6 py-4 bg-background/70 backdrop-blur-sm border-b border-border isolate"
         >
-          <BrandTitle />
-        </motion.button>
+          <motion.button
+            type="button"
+            onClick={() => r.push('/app')}
+            className="group inline-flex items-center gap-2 will-change-transform"
+            aria-label="Ir al inicio"
+            whileHover={{ y: -2 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
+          >
+            <BrandTitle />
+          </motion.button>
 
-        <nav className="flex items-center gap-3">
-          <Button
-            onClick={() => r.push('/app/orders/new')}
-            aria-label="Nuevo pedido"
-            className="
+          <nav className="flex items-center gap-3">
+            <Button
+              onClick={() => r.push('/app/orders/new')}
+              aria-label="Nuevo pedido"
+              className="
               rounded-xl
               px-6 py-7
               text-base font-extrabold
               text-white
               bg-[#FF4D00]
             "
-            variant="default"
-          >
-            <Plus size={20} strokeWidth={5} />
-            <span>NUEVO PEDIDO</span>
-          </Button>
-          <Button
-            onClick={() => r.push('/app')}
-            aria-label="Ir al inicio"
-            className="
+              variant="default"
+            >
+              <Plus size={20} strokeWidth={5} />
+              <span>NUEVO PEDIDO</span>
+            </Button>
+            <Button
+              onClick={() => r.push('/app')}
+              aria-label="Ir al inicio"
+              className="
               px-5 py-7
               rounded-xl
               border-2 border-foreground/40 
               bg-background/70 
               text-foreground 
             "
-          >
-            <Home size={24} strokeWidth={2.5} />
-          </Button>
-          <motion.div
-            whileHover={{ y: -1, boxShadow: '0 10px 24px rgba(0,0,0,0.12)' }}
-            whileTap={{ scale: 0.98 }}
-            transition={{ duration: 0.16 }}
-            className="rounded-full"
-          >
-            <Avatar className="h-15 w-15 ring-1 ring-black/10 dark:ring-white/10 bg-amber-500">
-              <AvatarImage
-                src="https://api.dicebear.com/9.x/fun-emoji/svg?seed=creamax"
-                alt="Avatar usuario"
-              />
-              <AvatarFallback>CU</AvatarFallback>
-            </Avatar>
-          </motion.div>
-        </nav>
-      </motion.header>
+            >
+              <Home size={24} strokeWidth={2.5} />
+            </Button>
+            <motion.div
+              whileHover={{ y: -1, boxShadow: '0 10px 24px rgba(0,0,0,0.12)' }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ duration: 0.16 }}
+              className="rounded-full"
+            >
+              <Avatar className="h-15 w-15 ring-1 ring-black/10 dark:ring-white/10 bg-amber-500">
+                <AvatarImage
+                  src="https://api.dicebear.com/9.x/fun-emoji/svg?seed=creamax"
+                  alt="Avatar usuario"
+                />
+                <AvatarFallback>CU</AvatarFallback>
+              </Avatar>
+            </motion.div>
+          </nav>
+        </motion.header>
 
-      <Separator />
-      <main className="h-[calc(100vh-100px)] py-4 px-10">{children}</main>
-    </div>
+        <Separator />
+        <main className="h-[calc(100vh-100px)] py-4 px-10">{children}</main>
+      </div>
+    </ActiveModelProvider>
   );
 }

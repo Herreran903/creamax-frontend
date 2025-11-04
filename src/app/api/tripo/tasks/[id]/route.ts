@@ -41,7 +41,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     const statusMap = {
       queued: 'PENDING',
       running: 'RUNNING',
-      success: 'CEEDED',
+      success: 'SUCCEEDED',
       failed: 'FAILED',
       banned: 'FAILED',
       expired: 'FAILED',
@@ -49,12 +49,30 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       unknown: 'UNKNOWN',
     } as const;
 
+    const errorMessage =
+      (json as any)?.message ||
+      (d as any)?.message ||
+      (d as any)?.error_message ||
+      (d as any)?.status_message ||
+      (d as any)?.failure_reason ||
+      (d as any)?.reason ||
+      null;
+
+    const errorCode =
+      (typeof (json as any)?.code === 'number' && (json as any)?.code !== 0
+        ? (json as any)?.code
+        : null) ??
+      (d as any)?.error_code ??
+      null;
+
     return NextResponse.json({
       taskId: d.task_id,
       status: statusMap[d.status] ?? 'UNKNOWN',
       progress: typeof d.progress === 'number' ? d.progress : null,
       glbUrl: d.output?.model ?? null,
       previewUrl: d.output?.rendered_image ?? null,
+      errorMessage,
+      errorCode,
     });
   } catch (err) {
     console.error('Error consultando tarea Tripo:', err);

@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { FileDrop } from '@/components/core/forms/file-drop';
 import { ModelViewer } from '@/components/core/3d/model-viewer';
 import { PRESETS, SelectedMode } from './model-source-tabs';
+import { useActiveModel } from '@/stores/active-model';
 
 export type QuoteData = {
   amount: number;
@@ -19,7 +20,7 @@ export type OptionsAndQuoteProps = {
   selectedMode: SelectedMode;
   selectedPresetId: string | null;
   uploadedUrl: string | null;
-  aiGlbUrl: string | null; // pass from parent (hook state)
+  aiGlbUrl: string | null;
   notes: string;
   setNotes: (s: string) => void;
   onBack: () => void;
@@ -42,6 +43,9 @@ export default function OptionsAndQuote({
   const [quantity, setQuantity] = React.useState<number>(50);
   const [presetOverlay, setPresetOverlay] = React.useState<string | null>(null);
   const [quoteData, setQuoteData] = React.useState<QuoteData | null>(null);
+
+  const { state: amState } = useActiveModel();
+  const isModelReady = amState.status === 'READY' && !!(amState as any).data;
 
   const demoKind =
     selectedMode === 'PRESETS'
@@ -87,12 +91,23 @@ export default function OptionsAndQuote({
         <div className="absolute inset-0 -z-10 pointer-events-none opacity-35">
           <ModelViewer
             className="h-full"
-            src={backgroundSrc}
+            object={isModelReady ? (amState as any).data : undefined}
+            src={!isModelReady ? backgroundSrc : undefined}
             demoKind={selectedMode === 'PRESETS' ? (demoKind as any) : undefined}
             overlayImage={selectedMode === 'PRESETS' ? (presetOverlay ?? undefined) : undefined}
             autoRotate
             spinSpeed={0.6}
           />
+        </div>
+      )}
+
+      {!isModelReady && !isArtisanal && (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="mb-3 rounded-lg border border-amber-300 bg-amber-100 text-amber-900 px-3 py-2 text-sm"
+        >
+          Elige o genera un modelo en el Paso 1 antes de continuar.
         </div>
       )}
 

@@ -19,12 +19,45 @@ export async function GET(req: Request) {
 
     const buf = await res.arrayBuffer();
 
+    // Preserve upstream content type when possible; infer from URL otherwise
+    let contentType = res.headers.get('content-type') || '';
+    if (!contentType) {
+      try {
+        const u = new URL(url);
+        const ext = (u.pathname.split('.').pop() || '').toLowerCase();
+        contentType =
+          ext === 'glb'
+            ? 'model/gltf-binary'
+            : ext === 'gltf'
+              ? 'model/gltf+json'
+              : ext === 'fbx'
+                ? 'application/octet-stream'
+                : ext === 'obj'
+                  ? 'model/obj'
+                  : ext === 'stl'
+                    ? 'model/stl'
+                    : 'application/octet-stream';
+      } catch {
+        contentType = 'application/octet-stream';
+      }
+    }
+
+    // Derive filename from URL for better UX
+    let filename = 'resource';
+    try {
+      const u = new URL(url);
+      const base = u.pathname.split('/').pop();
+      if (base) filename = base;
+    } catch {
+      // keep default
+    }
+
     return new NextResponse(buf, {
       headers: {
-        'Content-Type': 'model/gltf-binary',
+        'Content-Type': contentType,
         'Cache-Control': 'no-store',
         'Access-Control-Allow-Origin': '*',
-        'Content-Disposition': 'inline; filename="model.glb"',
+        'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
       },
     });
   } catch (err) {

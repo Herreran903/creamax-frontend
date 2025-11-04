@@ -10,6 +10,7 @@ import { PreviewStage } from '@/components/preview-stage';
 import { Upload, FileType2, RefreshCw, FileDown } from 'lucide-react';
 import { useUpload3DTask, MAX_3D_FILE_MB } from '@/hooks/use-upload3d-task';
 import { GLTFLoader, OBJLoader, STLLoader, GLTFExporter } from 'three-stdlib';
+import { useActiveModel } from '@/stores/active-model';
 
 export type Upload3DTabProps = {
   uploadedName: string | null;
@@ -28,6 +29,7 @@ export default function Upload3DTab({
 }: Upload3DTabProps) {
   const { status, progress, url, fileMeta, error, loadFiles, markReady, reset } = useUpload3DTask();
   const [exporting, setExporting] = React.useState(false);
+  const { setLoading, setProgress: setAMProgress, setReady, setError } = useActiveModel();
 
   // When hook resolves an object URL, reflect in parent so the global flow "Continuar" gets enabled.
   React.useEffect(() => {
@@ -39,13 +41,119 @@ export default function Upload3DTab({
     else setUploadedUrl(null);
   }, [url, setUploadedUrl]);
 
-  // Small auto-finish to mirror VALIDATING -> LOADING -> READY UX
+  // Emit progress to global ActiveModel while local loader runs
   React.useEffect(() => {
-    if (url && (status === 'PENDING' || status === 'RUNNING')) {
-      const id = setTimeout(() => markReady(), 1200);
-      return () => clearTimeout(id);
+    if (status === 'PENDING' || status === 'RUNNING') {
+      if (!fileMeta) return;
+      setLoading({
+        source: 'upload',
+        format: (fileMeta.ext as any) || 'glb',
+        name: fileMeta.name,
+        sizeMB: Math.round((fileMeta.size / (1024 * 1024)) * 10) / 10,
+        createdAt: Date.now(),
+      });
+      if (typeof progress === 'number') setAMProgress(progress);
     }
-  }, [url, status, markReady]);
+  }, [status, progress, fileMeta, setLoading, setAMProgress]);
+
+  // Load dropped model into memory and set READY in the ActiveModel store
+  React.useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (!url || !fileMeta) return;
+      try {
+        const ext = (fileMeta.ext || getExt(url)).toLowerCase();
+        let data: any;
+        let triangles = 0;
+        let materials = 0;
+
+        if (ext === 'glb' || ext === 'gltf') {
+          const gltf = await new GLTFLoader().loadAsync(url);
+          if (cancelled) return;
+          gltf.scene.traverse((obj: any) => {
+            if (obj.isMesh) {
+              const g = obj.geometry as THREE.BufferGeometry;
+              if (g) {
+                const index = g.getIndex();
+                const pos = g.getAttribute('position');
+                if (index) triangles += index.count / 3;
+                else if (pos) triangles += pos.count / 3;
+              }
+              if (obj.material) materials += Array.isArray(obj.material) ? obj.material.length : 1;
+            }
+          });
+          data = gltf;
+        } else if (ext === 'obj') {
+          const obj = await new OBJLoader().loadAsync(url);
+          if (cancelled) return;
+          obj.traverse((child: any) => {
+            if ((child as THREE.Mesh)?.isMesh) {
+              const mesh = child as THREE.Mesh;
+              if (!mesh.material) {
+                mesh.material = new THREE.MeshStandardMaterial({
+                  color: '#cbd5e1',
+                  metalness: 0.2,
+                  roughness: 0.7,
+                });
+              }
+              const g = mesh.geometry as THREE.BufferGeometry | undefined;
+              if (g) {
+                if (!g.attributes.normal) g.computeVertexNormals();
+                const index = g.getIndex();
+                const pos = g.getAttribute('position');
+                if (index) triangles += index.count / 3;
+                else if (pos) triangles += pos.count / 3;
+              }
+              materials += 1;
+            }
+          });
+          data = obj;
+        } else if (ext === 'stl') {
+          const geom = await new STLLoader().loadAsync(url);
+          if (cancelled) return;
+          const mesh = new THREE.Mesh(
+            geom,
+            new THREE.MeshStandardMaterial({ color: '#7dd3fc', metalness: 0.3, roughness: 0.4 })
+          );
+          const g = mesh.geometry as THREE.BufferGeometry;
+          const pos = g.getAttribute('position');
+          if (pos) triangles += pos.count / 3;
+          materials = 1;
+          const group = new THREE.Group();
+          group.add(mesh);
+          data = group;
+        } else {
+          throw new Error('Formato no soportado');
+        }
+
+        setReady(data, {
+          name: fileMeta.name,
+          format: ext as 'glb' | 'gltf' | 'obj' | 'stl',
+          triangles,
+          materials,
+          sizeMB: Math.round((fileMeta.size / (1024 * 1024)) * 10) / 10,
+          source: 'upload',
+          createdAt: Date.now(),
+        });
+
+        // keep local UI marking as ready for preview stage consistency
+        if (status === 'PENDING' || status === 'RUNNING') {
+          setTimeout(() => !cancelled && markReady(), 400);
+        }
+      } catch (e: any) {
+        if (cancelled) return;
+        setError(
+          e?.message ||
+            'No se pudo cargar el archivo. Verifica el formato o intenta exportar a GLB y reintenta.',
+          { source: 'upload', format: (fileMeta.ext as any) || 'glb', createdAt: Date.now() }
+        );
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [url, fileMeta, markReady, setReady, setError, status]);
 
   const accept3D = {
     'model/gltf-binary': ['.glb'],

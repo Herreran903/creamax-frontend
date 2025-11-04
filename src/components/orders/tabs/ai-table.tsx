@@ -1,15 +1,16 @@
 'use client';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { FileDrop } from '@/components/core/forms/file-drop';
-import { ModelViewer } from '@/components/core/3d/model-viewer';
-import { Hammer, Image, Image as ImageIcon, TextInitial, Trash2 } from 'lucide-react';
+import { Hammer, Image, TextInitial } from 'lucide-react';
 import { useTripoTask, MAX_WAIT_MS as MAX_WAIT_MS_EXPORT } from '@/hooks/use-tripo-task';
 import { Label } from '@/components/ui/label';
 import { StatusPanel } from '@/components/status-panel';
 import { PreviewStage } from '@/components/preview-stage';
+import { useActiveModel } from '@/stores/active-model';
+import { GLTFLoader } from 'three-stdlib';
+import * as THREE from 'three';
 
 export type AiTabProps = {};
 
@@ -17,12 +18,93 @@ export default function AiTab(_props: AiTabProps) {
   const [prompt, setPrompt] = React.useState('');
   const [imageUrl, setImageUrl] = React.useState('');
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
-  const [aiArtisan, setAiArtisan] = React.useState(false);
-  const [aiArtisanNotes, setAiArtisanNotes] = React.useState('');
   const [uploading, setUploading] = React.useState(false);
 
   const { taskId, status, progress, previewUrl, glbUrl, error, createTask } = useTripoTask();
   const MAX_WAIT_MS = MAX_WAIT_MS_EXPORT;
+
+  const { setLoading, setProgress: setAMProgress, setReady, setError } = useActiveModel();
+
+  const didEmitRef = React.useRef(false);
+
+  const canGenerate = React.useMemo(
+    () => prompt.trim().length > 0 || !!(imageUrl || imagePreview),
+    [prompt, imageUrl, imagePreview]
+  );
+  const onGenerate = React.useCallback(async () => {
+    if (!canGenerate) {
+      return;
+    }
+
+    didEmitRef.current = false;
+    setLoading({
+      source: 'ai',
+      format: 'glb',
+      name: 'Modelo IA',
+      createdAt: Date.now(),
+    });
+
+    await createTask(prompt.trim(), { imageUrl });
+  }, [canGenerate, createTask, imageUrl, prompt, setLoading]);
+
+  React.useEffect(() => {
+    if (status === 'RUNNING' || status === 'PENDING') {
+      if (typeof progress === 'number') setAMProgress(progress);
+    } else if (status === 'FAILED') {
+      setError(error || 'La generación con IA falló. Intenta nuevamente.', {
+        source: 'ai',
+        format: 'glb',
+        createdAt: Date.now(),
+      });
+    }
+  }, [status, progress, error, setAMProgress, setError]);
+
+  React.useEffect(() => {
+    const loadAndSet = async () => {
+      if (!glbUrl || didEmitRef.current) return;
+      try {
+        const proxied = `/api/tripo/proxy?url=${encodeURIComponent(glbUrl)}`;
+        const loader = new GLTFLoader();
+        const gltf = await loader.loadAsync(proxied);
+
+        let triangles = 0;
+        let materials = 0;
+        gltf.scene.traverse((obj: any) => {
+          if (obj.isMesh) {
+            const g = obj.geometry as THREE.BufferGeometry;
+            if (g) {
+              const index = g.getIndex();
+              const pos = g.getAttribute('position');
+              if (index) triangles += index.count / 3;
+              else if (pos) triangles += pos.count / 3;
+            }
+            if (obj.material) {
+              if (Array.isArray(obj.material)) materials += obj.material.length;
+              else materials += 1;
+            }
+          }
+        });
+
+        setReady(gltf, {
+          name: 'Modelo IA',
+          format: 'glb',
+          triangles,
+          materials,
+          sizeMB: undefined,
+          source: 'ai',
+          createdAt: Date.now(),
+        });
+        didEmitRef.current = true;
+      } catch (e) {
+        setError('No se pudo cargar el modelo generado por IA.', {
+          source: 'ai',
+          format: 'glb',
+          createdAt: Date.now(),
+        });
+      }
+    };
+    void loadAndSet();
+  }, [glbUrl, setReady, setError]);
 
   const onDropImages = async (files: File[]) => {
     if (!files?.length) return;
@@ -37,6 +119,8 @@ export default function AiTab(_props: AiTabProps) {
       setImageUrl(data.url);
       setImagePreview(URL.createObjectURL(f));
     } catch (e) {
+      setImageUrl('');
+      setImagePreview(null);
     } finally {
       setUploading(false);
     }
@@ -72,6 +156,11 @@ export default function AiTab(_props: AiTabProps) {
                 className="resize-none rounded-xl border-2 border-border bg-background text-foreground
                focus-visible:ring-1 focus-visible:ring-[#0B4D67]"
               />
+              {!canGenerate && (
+                <p id="ia-helper" aria-live="polite" className="mt-1 text-xs text-muted-foreground">
+                  Agrega una imagen, o escribe una descripción (o ambas) para continuar.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label
@@ -90,7 +179,15 @@ export default function AiTab(_props: AiTabProps) {
               />
             </div>
             <Button
-              onClick={() => createTask(prompt, imageUrl)}
+              onClick={onGenerate}
+              aria-disabled={!canGenerate}
+              aria-describedby={!canGenerate ? 'ia-helper' : undefined}
+              title={
+                !canGenerate
+                  ? 'Agrega una imagen, o escribe una descripción (o ambas) para continuar.'
+                  : undefined
+              }
+              disabled={!canGenerate}
               className="
                 rounded-xl
                 px-5 py-5
@@ -98,6 +195,8 @@ export default function AiTab(_props: AiTabProps) {
                 text-white
                 bg-[#FF4D00]
                 w-full
+                disabled:opacity-50 disabled:cursor-not-allowed
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B4D67]
             "
             >
               <Hammer size={20} strokeWidth={3} />

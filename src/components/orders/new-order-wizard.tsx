@@ -8,6 +8,7 @@ import FinalStep from './final-step';
 import { useTripoTask } from '@/hooks/use-tripo-task';
 import { ArrowLeft, ArrowRight, CheckCircle2, Home } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useActiveModel } from '@/stores/active-model';
 
 export default function NewOrderWizard() {
   const r = useRouter();
@@ -25,17 +26,9 @@ export default function NewOrderWizard() {
   const [svgReady, setSvgReady] = React.useState(false);
 
   const { glbUrl: aiGlbUrl } = useTripoTask();
+  const { state: amState } = useActiveModel();
 
-  const canContinue =
-    activeTab === 'ai'
-      ? Boolean(aiGlbUrl)
-      : activeTab === 'upload3d'
-        ? Boolean(uploadedUrl)
-        : activeTab === 'artisanal'
-          ? artisanDescription.trim().length >= 10 || artisanImageUrls.length > 0
-          : activeTab === 'svg'
-            ? svgReady
-            : Boolean(selectedPresetId);
+  const canContinue = amState.status === 'READY' && !!(amState as any).data;
 
   const goNext = async () => {
     if (step === 1) {
@@ -101,6 +94,8 @@ export default function NewOrderWizard() {
             <Button
               onClick={goNext}
               aria-label={primaryLabel}
+              aria-disabled={step === 1 && !canContinue}
+              title={step === 1 && !canContinue ? 'Primero elige/genera un modelo' : undefined}
               disabled={step === 1 && !canContinue}
               className="
                   rounded-xl

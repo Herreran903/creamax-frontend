@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { Save, Settings2 } from 'lucide-react';
 import * as THREE from 'three';
 import { normalizeColor, parseFill } from '@/lib/svg/normalizeColor';
+import { useActiveModel } from '@/stores/active-model';
 
 // three GLTF exporter (runtime import inside handler to keep bundle light)
 type GLTFExporterType = typeof import('three/examples/jsm/exporters/GLTFExporter.js').GLTFExporter;
@@ -128,16 +129,32 @@ export default function SvgExtrudeTab({
     null
   );
   const [progress, setProgress] = React.useState<number | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [svgError, setSvgError] = React.useState<string | null>(null);
 
   // R3F group ref for GLTF export
   const groupRef = React.useRef<THREE.Group | null>(null);
 
+  // Global ActiveModel store emitters
+  const {
+    setLoading,
+    setProgress: setAMProgress,
+    setReady,
+    setError: setAMError,
+  } = useActiveModel();
+  const emittedRef = React.useRef(false);
+  const [groupReadyTick, setGroupReadyTick] = React.useState(0);
+
   const openWorkerAndProcess = React.useCallback(
     async (svgText: string) => {
+      setLoading({
+        source: 'svg',
+        format: 'procedural',
+        name: svgName || 'SVG',
+        createdAt: Date.now(),
+      });
       setStatus('RUNNING');
       setProgress(0);
-      setError(null);
+      setSvgError(null);
       setResult(null);
       onReadyChange?.(false);
 
@@ -148,7 +165,13 @@ export default function SvgExtrudeTab({
       } catch (e: any) {
         setStatus('FAILED');
         const msg = e?.message || 'Error leyendo SVG';
-        setError(msg);
+        setSvgError(msg);
+        setAMError(msg, {
+          source: 'svg',
+          format: 'procedural',
+          name: svgName || 'SVG',
+          createdAt: Date.now(),
+        });
         toast.error(msg);
         return;
       }
@@ -167,9 +190,16 @@ export default function SvgExtrudeTab({
 
         if (msg.type === 'progress') {
           setProgress(msg.progress);
+          setAMProgress(msg.progress);
         } else if (msg.type === 'error') {
           setStatus('FAILED');
-          setError(msg.error);
+          setSvgError(msg.error);
+          setAMError(msg.error, {
+            source: 'svg',
+            format: 'procedural',
+            name: svgName || 'SVG',
+            createdAt: Date.now(),
+          });
           toast.error(msg.error);
           onReadyChange?.(false);
           worker.terminate();
@@ -224,7 +254,7 @@ export default function SvgExtrudeTab({
         const text = await f.text();
         openWorkerAndProcess(text);
       } catch (e: any) {
-        setError('No se pudo leer el archivo SVG.');
+        setSvgError('No se pudo leer el archivo SVG.');
         setStatus('FAILED');
         toast.error('No se pudo leer el archivo SVG.');
       }
@@ -270,6 +300,41 @@ export default function SvgExtrudeTab({
   };
 
   const hasResult = !!result && result.colors.length > 0;
+
+  // When the extruded group is ready in the viewer, emit READY to global store once
+  React.useEffect(() => {
+    if (status !== 'SUCCEEDED') return;
+    if (!groupRef.current) return;
+    if (emittedRef.current) return;
+
+    let triangles = 0;
+    let materials = 0;
+    groupRef.current.traverse((obj: any) => {
+      if (obj.isMesh) {
+        const g = obj.geometry as THREE.BufferGeometry | undefined;
+        if (g) {
+          const index = g.getIndex();
+          const pos = g.getAttribute('position');
+          if (index) triangles += index.count / 3;
+          else if (pos) triangles += pos.count / 3;
+        }
+        if (obj.material) {
+          materials += Array.isArray(obj.material) ? obj.material.length : 1;
+        }
+      }
+    });
+
+    setReady(groupRef.current, {
+      name: svgName || 'Modelo SVG',
+      format: 'procedural',
+      triangles,
+      materials,
+      sizeMB: undefined,
+      source: 'svg',
+      createdAt: Date.now(),
+    });
+    emittedRef.current = true;
+  }, [status, groupReadyTick, setReady, svgName]);
 
   return (
     <div className="grid grid-cols-12 gap-4">
@@ -348,7 +413,7 @@ export default function SvgExtrudeTab({
         </div>
 
         <div className="space-y-2">
-          <StatusPanel status={status} progress={progress} error={error} />
+          <StatusPanel status={status} progress={progress} error={svgError} />
           {hasResult ? (
             <div className="rounded-xl border border-border bg-white/60 backdrop-blur-sm p-3 space-y-2">
               <p className="text-xs font-semibold">Altura por color</p>
@@ -403,7 +468,10 @@ export default function SvgExtrudeTab({
           depthMap={depthMap}
           selectedHex={selectedHex}
           className="h-[60vh]"
-          onGroupReady={(g) => (groupRef.current = g)}
+          onGroupReady={(g) => {
+            groupRef.current = g;
+            setGroupReadyTick((x) => x + 1);
+          }}
         />
 
         <div className="flex items-center gap-2">

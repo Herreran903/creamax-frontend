@@ -10,15 +10,6 @@ import { Center, Float, useGLTF } from '@react-three/drei';
 type Step = { label: string; kind?: 'cart' | 'options' | 'done' };
 type Props = { current: number; steps: Step[]; className?: string };
 
-function GLTFPreload() {
-  React.useEffect(() => {
-    useGLTF.preload('/models/Cart.glb');
-    useGLTF.preload('/models/Gear.glb');
-    useGLTF.preload('/models/Check.glb');
-  }, []);
-  return null;
-}
-
 function Rotator({
   axis = 'y',
   speed = 1,
@@ -39,6 +30,28 @@ function Rotator({
     else if (axis === 'y') r.y += incr;
     else r.z += incr;
   });
+  return <group ref={ref}>{children}</group>;
+}
+
+// Auto-fit group to a target size so icons always render at a consistent scale
+function FitNormalize({ children, target = 1.2 }: { children: React.ReactNode; target?: number }) {
+  const ref = React.useRef<THREE.Group>(null!);
+  React.useLayoutEffect(() => {
+    const g = ref.current;
+    if (!g) return;
+    // Reset transforms
+    g.scale.set(1, 1, 1);
+    g.position.set(0, 0, 0);
+    const box = new THREE.Box3().setFromObject(g);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const s = target / maxDim;
+    g.scale.setScalar(s);
+    g.position.set(-center.x * s, -center.y * s, -center.z * s);
+  }, [children, target]);
   return <group ref={ref}>{children}</group>;
 }
 
@@ -65,7 +78,6 @@ function GLBIconInner({
 }) {
   const { scene } = useGLTF(url);
   const cloned = React.useMemo(() => scene.clone(true), [scene]);
-  console.log('cloned', cloned);
 
   React.useLayoutEffect(() => {
     cloned.traverse((o: any) => {
@@ -81,13 +93,20 @@ function GLBIconInner({
 
   return (
     <div className="inline-block" style={{ width: size, height: size, pointerEvents: 'none' }}>
-      <Canvas dpr={[1, 2]} gl={{ antialias: true }} camera={{ position: [0, 0, 0], fov: 25 }}>
-        <ambientLight intensity={1} />
+      <Canvas
+        dpr={[1, 2]}
+        gl={{ antialias: true, alpha: true }}
+        camera={{ position: [0, 0, 2.5], fov: 35, near: 0.01, far: 100 }}
+      >
+        <ambientLight intensity={0.9} />
+        <directionalLight position={[2, 2, 2]} intensity={1} />
         <Center>
           <Float speed={active ? 1 : 0.6} floatIntensity={active ? 0.32 : 0} rotationIntensity={0}>
             <Rotator axis={axis} speed={active ? angularSpeed : 0.001} active>
-              <group scale={scale} rotation={rotation} position={position}>
-                <primitive object={cloned} />
+              <group rotation={rotation} position={position} scale={scale}>
+                <FitNormalize>
+                  <primitive object={cloned} />
+                </FitNormalize>
               </group>
             </Rotator>
           </Float>
@@ -110,13 +129,7 @@ export function GLBIcon(props: React.ComponentProps<typeof GLBIconInner>) {
 
 function IconCart({ active, color }: { active: boolean; color: string }) {
   return (
-    <GLBIcon
-      url="/models/Cart.glb"
-      active={active}
-      color={color}
-      scale={10}
-      position={[0, -15, 0]}
-    />
+    <GLBIcon url="/models/Cart.glb" active={active} color={color} scale={1} position={[0, 0, 0]} />
   );
 }
 function IconGear({ active, color }: { active: boolean; color: string }) {
@@ -125,13 +138,13 @@ function IconGear({ active, color }: { active: boolean; color: string }) {
       url="/models/Gear.glb"
       active={active}
       color={color}
-      scale={2}
+      scale={1}
       rotation={[0, Math.PI / 1.35, 0]}
     />
   );
 }
 function IconCheck({ active, color }: { active: boolean; color: string }) {
-  return <GLBIcon url="/models/Check.glb" active={active} color={color} scale={0.5} />;
+  return <GLBIcon url="/models/Check.glb" active={active} color={color} scale={1} />;
 }
 
 function StepMiniIcon({
@@ -152,7 +165,6 @@ function StepMiniIcon({
 export function Stepper({ current, steps, className }: Props) {
   return (
     <div className={cn('w-full', className)}>
-      <GLTFPreload />
       <div className="flex items-center gap-4">
         {steps.map((s, i) => {
           const idx = i + 1;

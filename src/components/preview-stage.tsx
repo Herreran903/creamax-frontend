@@ -86,9 +86,16 @@ export function PreviewStage({
       {state === 'ready' && (
         <>
           {glbUrl ? (
-            <ModelViewer src={glbUrl} className="h-full w-full" autoRotate spinSpeed={0.6} />
+            <ModelViewer
+              key={glbUrl}
+              src={glbUrl}
+              className="h-full w-full"
+              autoRotate
+              spinSpeed={0.6}
+            />
           ) : imageUrl ? (
             <img
+              key={imageUrl}
               src={imageUrl}
               alt="resultado"
               className="absolute inset-0 w-full h-full object-contain"
