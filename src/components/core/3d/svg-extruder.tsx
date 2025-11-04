@@ -62,7 +62,10 @@ function buildGeometryForGroup(
   return merged;
 }
 
-function centerAndOrient(geometry: THREE.BufferGeometry): { offset: THREE.Vector3; size: THREE.Vector3 } {
+function centerAndOrient(geometry: THREE.BufferGeometry): {
+  offset: THREE.Vector3;
+  size: THREE.Vector3;
+} {
   geometry.computeBoundingBox();
   const bb = geometry.boundingBox!;
   const size = new THREE.Vector3();
@@ -189,7 +192,11 @@ export function SvgExtruderCanvas({
         className
       )}
     >
-      <Canvas shadows camera={{ position: [2.4, 2.2, 2.4], fov: 45 }} onCreated={({ gl }) => gl.setClearColor(new THREE.Color(0x000000), 0)}>
+      <Canvas
+        shadows
+        camera={{ position: [2.4, 2.2, 2.4], fov: 45 }}
+        onCreated={({ gl }) => gl.setClearColor(new THREE.Color(0x000000), 0)}
+      >
         <ambientLight intensity={0.35} />
         <directionalLight position={[4, 6, 4]} intensity={0.9} castShadow />
         <Environment preset="city" />

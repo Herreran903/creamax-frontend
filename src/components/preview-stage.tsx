@@ -2,10 +2,8 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { Canvas } from '@react-three/fiber';
-import { Float, ContactShadows, Environment, Segments, Segment } from '@react-three/drei';
 import { ModelViewer } from '@/components/core/3d/model-viewer';
-import * as THREE from 'three';
+import { Loader } from 'lucide-react';
 
 type PreviewState = 'idle' | 'loading' | 'ready';
 
@@ -51,7 +49,13 @@ export function PreviewStage({
         className
       )}
     >
-      {state === 'idle' && <IdleFigure3D />}
+      {state === 'idle' && (
+        <div>
+          <span className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">
+            Inicie el proceso para ver la vista previa aquí.
+          </span>
+        </div>
+      )}
 
       {state === 'loading' && (
         <>
@@ -62,9 +66,11 @@ export function PreviewStage({
               className="absolute inset-0 w-full h-full object-contain opacity-30"
             />
           ) : null}
-          <LoadingFigure3D />
+          <div>
+            <Loader className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-16 w-16 text-black/30 animate-spin" />
+          </div>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 p-4">
-            <div className="rounded-xl bg-black/55 backdrop-blur-sm text-white px-3 py-2 w-fit max-w-full">
+            <div className="rounded-xl bg-[#0B4D67] backdrop-blur-sm text-white px-3 py-2 w-fit max-w-full">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <span className="inline-flex h-2 w-2 rounded-full bg-white animate-pulse" />
                 <span className="truncate">{messages[msgIdx]}</span>
@@ -88,126 +94,14 @@ export function PreviewStage({
               className="absolute inset-0 w-full h-full object-contain"
             />
           ) : (
-            <IdleFigure3D />
+            <div>
+              <span className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">
+                No se ha proporcionado ningún GLB o imagen para previsualizar.
+              </span>
+            </div>
           )}
         </>
       )}
     </div>
-  );
-}
-
-function usePolyBallGeometry({
-  radius = 0.9,
-  detail = 1,
-  jitter = 0.04,
-}: {
-  radius?: number;
-  detail?: number;
-  jitter?: number;
-}) {
-  return React.useMemo(() => {
-    const geo = new THREE.IcosahedronGeometry(radius, detail);
-
-    const pos = geo.attributes.position as THREE.BufferAttribute;
-    const v = new THREE.Vector3();
-    for (let i = 0; i < pos.count; i++) {
-      v.set(pos.getX(i), pos.getY(i), pos.getZ(i)).normalize();
-      const f = 1 + (Math.random() * 2 - 1) * jitter;
-      v.multiplyScalar(radius * f);
-      pos.setXYZ(i, v.x, v.y, v.z);
-    }
-    pos.needsUpdate = true;
-    geo.computeVertexNormals();
-
-    return geo;
-  }, [radius, detail, jitter]);
-}
-
-function EdgesFatLines({
-  geometry,
-  color = '#1e3a8a',
-  lineWidth = 2,
-}: {
-  geometry: THREE.BufferGeometry;
-  color?: string | number;
-  lineWidth?: number;
-}) {
-  const segments = React.useMemo(() => {
-    const edges = new THREE.EdgesGeometry(geometry, 1);
-    const pos = edges.getAttribute('position') as THREE.BufferAttribute;
-    const segs: [THREE.Vector3, THREE.Vector3][] = [];
-    for (let i = 0; i < pos.count; i += 2) {
-      const a = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
-      const b = new THREE.Vector3(pos.getX(i + 1), pos.getY(i + 1), pos.getZ(i + 1));
-      segs.push([a, b]);
-    }
-    edges.dispose();
-    return segs;
-  }, [geometry]);
-
-  return (
-    <Segments
-      limit={segments.length}
-      lineWidth={lineWidth}
-      color={typeof color === 'string' ? new THREE.Color(color).getHex() : color}
-    >
-      {segments.map(([a, b], i) => (
-        <Segment key={i} start={a} end={b} />
-      ))}
-    </Segments>
-  );
-}
-
-export function IdleFigure3D() {
-  const geo = usePolyBallGeometry({ radius: 0.50, detail: 1, jitter: 0.01 });
-
-  return (
-    <Canvas camera={{ position: [2.2, 1.5, 2.4], fov: 50 }}>
-      <ambientLight intensity={0.85} />
-      <directionalLight position={[3, 4, 2]} intensity={1.2} />
-      <Float speed={1.2} rotationIntensity={0.35} floatIntensity={0.35}>
-        <mesh geometry={geo}>
-          <meshStandardMaterial
-            color="#E9E9E9"
-            transparent
-            opacity={0.25}
-            roughness={0.9}
-            metalness={0.05}
-            flatShading
-          />
-        </mesh>
-        <group>
-          <EdgesFatLines geometry={geo} color="#E9E9E9" lineWidth={2.2} />
-        </group>
-      </Float>
-      <ContactShadows opacity={0.35} blur={2} far={4} resolution={256} />
-    </Canvas>
-  );
-}
-
-export function LoadingFigure3D() {
-const geo = usePolyBallGeometry({ radius: 0.50, detail: 1, jitter: 0.01 });
-
-  return (
-    <Canvas camera={{ position: [0.2, 0.9, 2.1], fov: 55 }}>
-      <ambientLight intensity={0.9} />
-      <directionalLight position={[3, 4, 2]} intensity={1.2} />
-      <Float speed={2.2} rotationIntensity={0.9} floatIntensity={0.9}>
-        <mesh geometry={geo}>
-        <meshStandardMaterial
-            color="#FF4D00"
-            transparent
-            opacity={0.25}
-            roughness={0.9}
-            metalness={0.05}
-            flatShading
-          />
-        </mesh>
-        <group rotation={[Math.PI * 0.15, 0, 0]}>
-          <EdgesFatLines geometry={geo} color="#b93800" lineWidth={2.2} />
-        </group>
-      </Float>
-      <ContactShadows opacity={0.35} blur={2} far={4} resolution={256} />
-    </Canvas>
   );
 }

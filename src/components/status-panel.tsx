@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { CheckCircle2, Loader2, AlertCircle, Clock, Copy } from 'lucide-react';
+import { CheckCircle2, Loader2, AlertCircle, Clock } from 'lucide-react';
 
 export function StatusPanel({
   status,
@@ -17,12 +17,17 @@ export function StatusPanel({
   const isIdle = !status && !error && !taskId;
   const showProgress = typeof progress === 'number' && isWorking;
 
+  // Paleta base por estado
+  const baseHex = isWorking ? '#0B4D67' : isDone ? null : error ? null : null;
+  const baseClass = isWorking ? 'emerald-600' : isDone ? 'emerald-600' : error ? 'red-600' : null;
+
+  // Panel: fondo y borde por estado
   const tone = isWorking
-    ? 'bg-amber-500/10 border-amber-500/30'
+    ? 'bg-[#0B4D67]/10 border-[#0B4D67]/30'
     : isDone
-      ? 'bg-emerald-500/10 border-emerald-500/30'
+      ? 'bg-emerald-600/10 border-emerald-600/30'
       : error
-        ? 'bg-red-500/10 border-red-500/30'
+        ? 'bg-red-600/10 border-red-600/30'
         : 'bg-muted/40 border-border';
 
   const title = isWorking
@@ -35,6 +40,18 @@ export function StatusPanel({
 
   const Icon = isWorking ? Loader2 : isDone ? CheckCircle2 : error ? AlertCircle : Clock;
 
+  // Color del icono por estado
+  const iconColorClass = isWorking
+    ? 'text-[#0B4D67]'
+    : isDone
+      ? 'text-emerald-600'
+      : error
+        ? 'text-red-600'
+        : 'text-muted-foreground';
+
+  // Progreso clamped
+  const pct = Math.max(0, Math.min(100, progress ?? 0));
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -44,7 +61,7 @@ export function StatusPanel({
       aria-live="polite"
     >
       <div className="flex items-center gap-2">
-        <Icon className={isWorking ? 'animate-spin' : ''} size={18} />
+        <Icon className={`${isWorking ? 'animate-spin' : ''} ${iconColorClass}`} size={18} />
         <div className="text-sm font-semibold">{title}</div>
       </div>
 
@@ -52,20 +69,27 @@ export function StatusPanel({
         <div className="space-y-1">
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
             <span>Progreso</span>
-            <span>{Math.max(0, Math.min(100, progress!))}%</span>
+            <span>{pct}%</span>
           </div>
           <div className="h-2 w-full rounded-full bg-black/10 overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${Math.max(0, Math.min(100, progress!))}%` }}
+              animate={{ width: `${pct}%` }}
               transition={{ type: 'spring', stiffness: 140, damping: 20 }}
               className={`h-full rounded-full ${
-                progress! >= 100 ? 'bg-emerald-500' : 'bg-linear-to-r from-amber-400 to-amber-600'
+                isWorking
+                  ? 'bg-[#0B4D67]'
+                  : isDone
+                    ? 'bg-emerald-600'
+                    : error
+                      ? 'bg-red-600'
+                      : 'bg-muted'
               }`}
             />
           </div>
         </div>
       )}
+
       {error ? <div className="text-xs text-red-600 leading-relaxed">{error}</div> : null}
     </motion.div>
   );

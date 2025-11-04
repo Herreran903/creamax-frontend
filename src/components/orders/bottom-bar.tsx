@@ -42,7 +42,7 @@ export function BottomBar() {
             className="hidden"
             onChange={onFile}
           />
-          <Button variant="glass" className="gap-2" onClick={() => fileRef.current?.click()}>
+          <Button variant="secondary" className="gap-2" onClick={() => fileRef.current?.click()}>
             <Upload className="h-4 w-4" />
             Subir modelo (GLB/STL)
           </Button>

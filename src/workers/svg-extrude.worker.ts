@@ -1,6 +1,11 @@
 /* eslint-disable no-restricted-globals */
 /* SVGLoader dynamically imported only when needed (process path) */
-import type { SvgPolygon, SvgColorGroup, SvgProcessResult, SvgWorkerMessage } from '@/lib/svg/types';
+import type {
+  SvgPolygon,
+  SvgColorGroup,
+  SvgProcessResult,
+  SvgWorkerMessage,
+} from '@/lib/svg/types';
 import { normalizeColor, parseFill } from '@/lib/svg/normalizeColor';
 import { simplifyPolygons } from '@/lib/svg/simplify';
 import { unionPolygonsByColor } from '@/lib/svg/boolean';
@@ -34,7 +39,9 @@ const post = (msg: SvgWorkerMessage) => {
 
 function parseViewBox(svgText: string): [number, number, number, number] | undefined {
   // naive extraction; covers most SVGs
-  const m = svgText.match(/viewBox\s*=\s*["']\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*["']/i);
+  const m = svgText.match(
+    /viewBox\s*=\s*["']\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*["']/i
+  );
   if (!m) return undefined;
   return [parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3]), parseFloat(m[4])];
 }
@@ -61,7 +68,11 @@ function groupPathsByFill(paths: any[], curveSegments: number) {
   const groups = new Map<string, SvgColorGroup>();
   for (const p of paths) {
     // style may be on userData.style or material
-    const style = (p.userData?.style ?? {}) as Partial<{ fill: string; fillOpacity: string | number; opacity: string | number }>;
+    const style = (p.userData?.style ?? {}) as Partial<{
+      fill: string;
+      fillOpacity: string | number;
+      opacity: string | number;
+    }>;
     const fillInfo = parseFill(style) ?? null;
 
     const hex = fillInfo?.hex ?? normalizeColor((p.userData?.style as any)?.stroke) ?? null;
@@ -107,7 +118,12 @@ self.onmessage = async (ev: MessageEvent<InMsg>) => {
       }
 
       if (data.doUnion) {
-        post({ type: 'progress', step: 'boolean', progress: 92, note: 'Unión booleana (experimental)…' });
+        post({
+          type: 'progress',
+          step: 'boolean',
+          progress: 92,
+          note: 'Unión booleana (experimental)…',
+        });
         colors = colors.map((cg) => ({
           ...cg,
           shapes: unionPolygonsByColor(cg.shapes),

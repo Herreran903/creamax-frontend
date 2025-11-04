@@ -5,7 +5,13 @@ import { Button } from '@/components/ui/button';
 import { FileDrop } from '@/components/core/forms/file-drop';
 import { StatusPanel } from '@/components/status-panel';
 import SvgExtruder from '@/components/core/3d/svg-extruder';
-import type { DepthMap, SvgProcessResult, SvgWorkerMessage, SvgColorGroup, SvgPolygon } from '@/lib/svg/types';
+import type {
+  DepthMap,
+  SvgProcessResult,
+  SvgWorkerMessage,
+  SvgColorGroup,
+  SvgPolygon,
+} from '@/lib/svg/types';
 import { toast } from 'sonner';
 import { Save, Settings2 } from 'lucide-react';
 import * as THREE from 'three';
@@ -17,7 +23,9 @@ type GLTFExporterType = typeof import('three/examples/jsm/exporters/GLTFExporter
 // --- helpers (main-thread parsing to avoid DOMParser in Worker) ---
 
 function parseViewBox(svgText: string): [number, number, number, number] | undefined {
-  const m = svgText.match(/viewBox\s*=\s*["']\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*["']/i);
+  const m = svgText.match(
+    /viewBox\s*=\s*["']\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*["']/i
+  );
   if (!m) return undefined;
   return [parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3]), parseFloat(m[4])];
 }
@@ -42,7 +50,11 @@ function shapeToPolygons(shape: any, curveSegments: number): SvgPolygon[] {
 function groupPathsByFill(paths: any[], curveSegments: number) {
   const groups = new Map<string, SvgColorGroup>();
   for (const p of paths) {
-    const style = (p.userData?.style ?? {}) as Partial<{ fill: string; fillOpacity: string | number; opacity: string | number }>;
+    const style = (p.userData?.style ?? {}) as Partial<{
+      fill: string;
+      fillOpacity: string | number;
+      opacity: string | number;
+    }>;
     const fillInfo = parseFill(style) ?? null;
     const hex = fillInfo?.hex ?? normalizeColor((p.userData?.style as any)?.stroke) ?? null;
     if (!hex) continue;
@@ -59,7 +71,10 @@ function groupPathsByFill(paths: any[], curveSegments: number) {
   return groups;
 }
 
-async function computeColorsFromSvgText(svgText: string, curveSegments = 12): Promise<{
+async function computeColorsFromSvgText(
+  svgText: string,
+  curveSegments = 12
+): Promise<{
   colors: SvgColorGroup[];
   width: number;
   height: number;
@@ -73,7 +88,9 @@ async function computeColorsFromSvgText(svgText: string, curveSegments = 12): Pr
 
   const grouped = groupPathsByFill(paths, curveSegments);
   if (grouped.size === 0) {
-    throw new Error('No se detectaron colores de relleno (fill). Asegúrate de que el SVG tenga "fill".');
+    throw new Error(
+      'No se detectaron colores de relleno (fill). Asegúrate de que el SVG tenga "fill".'
+    );
   }
 
   const colors: SvgColorGroup[] = [];
@@ -107,102 +124,113 @@ export default function SvgExtrudeTab({
   const [doUnion, setDoUnion] = React.useState(false);
 
   // worker status
-  const [status, setStatus] = React.useState<'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | null>(null);
+  const [status, setStatus] = React.useState<'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | null>(
+    null
+  );
   const [progress, setProgress] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   // R3F group ref for GLTF export
   const groupRef = React.useRef<THREE.Group | null>(null);
 
-  const openWorkerAndProcess = React.useCallback(async (svgText: string) => {
-    setStatus('RUNNING');
-    setProgress(0);
-    setError(null);
-    setResult(null);
-    onReadyChange?.(false);
+  const openWorkerAndProcess = React.useCallback(
+    async (svgText: string) => {
+      setStatus('RUNNING');
+      setProgress(0);
+      setError(null);
+      setResult(null);
+      onReadyChange?.(false);
 
-    // Pre-parse SVG in main thread to avoid DOMParser in Worker
-    let parsed;
-    try {
-      parsed = await computeColorsFromSvgText(svgText, 12);
-    } catch (e: any) {
-      setStatus('FAILED');
-      const msg = e?.message || 'Error leyendo SVG';
-      setError(msg);
-      toast.error(msg);
-      return;
-    }
-
-    // IMPORTANT: Worker path resolved relatively to this file at build time
-    const worker = new Worker(new URL('../../../workers/svg-extrude.worker.ts', import.meta.url), {
-      type: 'module',
-    });
-
-    const onMsg = (ev: MessageEvent<SvgWorkerMessage>) => {
-      const msg = ev.data;
-      if (!msg) return;
-
-      if (msg.type === 'progress') {
-        setProgress(msg.progress);
-      } else if (msg.type === 'error') {
+      // Pre-parse SVG in main thread to avoid DOMParser in Worker
+      let parsed;
+      try {
+        parsed = await computeColorsFromSvgText(svgText, 12);
+      } catch (e: any) {
         setStatus('FAILED');
-        setError(msg.error);
-        toast.error(msg.error);
-        onReadyChange?.(false);
-        worker.terminate();
-      } else if (msg.type === 'result') {
-        setStatus('SUCCEEDED');
-        setProgress(100);
-        setResult(msg.result);
-        onReadyChange?.(true);
-        // initialize depth map to 1.0 per color
-        const dm: DepthMap = {};
-        for (const c of msg.result.colors) dm[c.hex] = 1.0;
-        setDepthMap(dm);
-        setSelectedHex(msg.result.colors[0]?.hex ?? null);
-
-        // mark mode as ready so wizard can continue
-        setSelectedMode('SVG');
-        onValueChange('svg');
-
-        // show non-blocking warnings
-        if (msg.result.warnings?.length) {
-          msg.result.warnings.forEach((w) => toast.message(w));
-        }
-
-        worker.terminate();
+        const msg = e?.message || 'Error leyendo SVG';
+        setError(msg);
+        toast.error(msg);
+        return;
       }
-    };
 
-    worker.onmessage = onMsg;
-    worker.postMessage({
-      type: 'process-polys',
-      colors: parsed.colors,
-      width: parsed.width,
-      height: parsed.height,
-      viewBox: parsed.viewBox,
-      simplifyTolerance: simplifyTol,
-      doUnion,
-    });
-  }, [doUnion, simplifyTol, onValueChange, setSelectedMode]);
+      // IMPORTANT: Worker path resolved relatively to this file at build time
+      const worker = new Worker(
+        new URL('../../../workers/svg-extrude.worker.ts', import.meta.url),
+        {
+          type: 'module',
+        }
+      );
 
-  const onFiles = React.useCallback(async (files: File[]) => {
-    const f = files?.[0];
-    if (!f) return;
-    if (!/\.svg$/i.test(f.name)) {
-      toast.error('Por favor sube un archivo .svg válido.');
-      return;
-    }
-    try {
-      setSvgName(f.name);
-      const text = await f.text();
-      openWorkerAndProcess(text);
-    } catch (e: any) {
-      setError('No se pudo leer el archivo SVG.');
-      setStatus('FAILED');
-      toast.error('No se pudo leer el archivo SVG.');
-    }
-  }, [openWorkerAndProcess]);
+      const onMsg = (ev: MessageEvent<SvgWorkerMessage>) => {
+        const msg = ev.data;
+        if (!msg) return;
+
+        if (msg.type === 'progress') {
+          setProgress(msg.progress);
+        } else if (msg.type === 'error') {
+          setStatus('FAILED');
+          setError(msg.error);
+          toast.error(msg.error);
+          onReadyChange?.(false);
+          worker.terminate();
+        } else if (msg.type === 'result') {
+          setStatus('SUCCEEDED');
+          setProgress(100);
+          setResult(msg.result);
+          onReadyChange?.(true);
+          // initialize depth map to 1.0 per color
+          const dm: DepthMap = {};
+          for (const c of msg.result.colors) dm[c.hex] = 1.0;
+          setDepthMap(dm);
+          setSelectedHex(msg.result.colors[0]?.hex ?? null);
+
+          // mark mode as ready so wizard can continue
+          setSelectedMode('SVG');
+          onValueChange('svg');
+
+          // show non-blocking warnings
+          if (msg.result.warnings?.length) {
+            msg.result.warnings.forEach((w) => toast.message(w));
+          }
+
+          worker.terminate();
+        }
+      };
+
+      worker.onmessage = onMsg;
+      worker.postMessage({
+        type: 'process-polys',
+        colors: parsed.colors,
+        width: parsed.width,
+        height: parsed.height,
+        viewBox: parsed.viewBox,
+        simplifyTolerance: simplifyTol,
+        doUnion,
+      });
+    },
+    [doUnion, simplifyTol, onValueChange, setSelectedMode]
+  );
+
+  const onFiles = React.useCallback(
+    async (files: File[]) => {
+      const f = files?.[0];
+      if (!f) return;
+      if (!/\.svg$/i.test(f.name)) {
+        toast.error('Por favor sube un archivo .svg válido.');
+        return;
+      }
+      try {
+        setSvgName(f.name);
+        const text = await f.text();
+        openWorkerAndProcess(text);
+      } catch (e: any) {
+        setError('No se pudo leer el archivo SVG.');
+        setStatus('FAILED');
+        toast.error('No se pudo leer el archivo SVG.');
+      }
+    },
+    [openWorkerAndProcess]
+  );
 
   const resetHeights = () => {
     if (!result) return;
@@ -276,7 +304,9 @@ export default function SvgExtrudeTab({
             />
           </div>
           <div className="space-y-1">
-            <label htmlFor="tol" className="text-xs">Tolerancia de simplificación</label>
+            <label htmlFor="tol" className="text-xs">
+              Tolerancia de simplificación
+            </label>
             <input
               id="tol"
               type="range"
@@ -304,12 +334,16 @@ export default function SvgExtrudeTab({
                 setTimeout(() => setStatus('RUNNING'), 10);
                 // We need the original SVG text; since we don't persist it, ask user to re-seleccionar o re-leer.
                 // For UX v1 simple: show toast
-                toast.message('Vuelve a seleccionar el archivo para reprocesar con nuevas opciones.');
+                toast.message(
+                  'Vuelve a seleccionar el archivo para reprocesar con nuevas opciones.'
+                );
               }}
             >
               Reprocesar
             </Button>
-            <Button variant="outline" onClick={resetHeights}>Reset alturas</Button>
+            <Button variant="outline" onClick={resetHeights}>
+              Reset alturas
+            </Button>
           </div>
         </div>
 
@@ -337,7 +371,9 @@ export default function SvgExtrudeTab({
                           aria-label={`Color ${c.hex}`}
                         />
                         <span className="text-xs font-medium">{c.hex}</span>
-                        <span className="ml-auto text-[11px] text-muted-foreground">{depth.toFixed(1)}mm</span>
+                        <span className="ml-auto text-[11px] text-muted-foreground">
+                          {depth.toFixed(1)}mm
+                        </span>
                       </div>
                       <input
                         type="range"

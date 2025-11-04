@@ -63,7 +63,9 @@ export function simplifyPath(points: Vec2[], tolerance = 0.5): Vec2[] {
     if (first[0] !== lastP[0] || first[1] !== lastP[1]) {
       // if original was closed, re-close
       const wasClosed =
-        points.length > 2 && points[0][0] === points[points.length - 1][0] && points[0][1] === points[points.length - 1][1];
+        points.length > 2 &&
+        points[0][0] === points[points.length - 1][0] &&
+        points[0][1] === points[points.length - 1][1];
       if (wasClosed) res.push([first[0], first[1]]);
     }
   }

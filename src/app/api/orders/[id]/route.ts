@@ -1,10 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import type { Order } from '@/domain/types';
 
-export async function GET(_req: Request, context: { params: { id: string } }) {
-  const { id } = context.params;
+export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
 
-  // Mock single-order fetch. If it's the demo "o1", enrich it a bit; otherwise return a stub.
   const demo: Order = {
     id,
     productType: 'LLAVERO',
@@ -19,11 +18,10 @@ export async function GET(_req: Request, context: { params: { id: string } }) {
   return NextResponse.json(demo);
 }
 
-export async function PATCH(req: Request, context: { params: { id: string } }) {
-  const { id } = context.params;
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   const body = await req.json();
 
-  // Echo-back update. In a real backend you would persist and return the updated entity.
   const updated: Partial<Order> & { id: string } = {
     id,
     ...body,

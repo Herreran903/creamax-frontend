@@ -107,7 +107,7 @@ export default function Page({ params }: { params: { id: string } }) {
                       onChange={(e) => setNfcUrl(e.target.value)}
                     />
                     <div className="flex justify-end">
-                      <Button variant="glass" onClick={handleSaveNfc} disabled={saving}>
+                      <Button variant="secondary" onClick={handleSaveNfc} disabled={saving}>
                         {saving ? 'Guardando…' : 'Guardar enlace'}
                       </Button>
                     </div>

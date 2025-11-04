@@ -89,30 +89,6 @@ export default function AiTab(_props: AiTabProps) {
                 className="text-xs"
               />
             </div>
-            {/* <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Switch checked={aiArtisan} onCheckedChange={setAiArtisan} />
-                <Label
-                  htmlFor="ai-prompt"
-                  className="text-xs font-bold tracking-wide text-foreground/80 flex"
-                >
-                  QUIERO REVISION ARTESANAL (+ COSTO)
-                </Label>
-              </div>
-              {aiArtisan && (
-                <div className="space-y-2">
-                  <Textarea
-                    value={aiArtisanNotes}
-                    onChange={(e) => setAiArtisanNotes(e.target.value)}
-                    placeholder="Ej. aumentar grosor, cambiar anilla, suavizar bordes, etc."
-                    rows={3}
-                    spellCheck
-                    className="resize-none rounded-xl border-2 border-border bg-background text-foreground
-                   focus-visible:ring-1 focus-visible:ring-[#0B4D67]"
-                  />
-                </div>
-              )}
-            </div> */}
             <Button
               onClick={() => createTask(prompt, imageUrl)}
               className="
@@ -125,7 +101,7 @@ export default function AiTab(_props: AiTabProps) {
             "
             >
               <Hammer size={20} strokeWidth={3} />
-              GENERAR
+              GENERAR CON IA
             </Button>
 
             <StatusPanel

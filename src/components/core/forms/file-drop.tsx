@@ -14,6 +14,7 @@ export interface FileDropProps {
   multiple?: boolean;
   emptyTitle?: string; // override main empty-state title
   formatsHint?: string; // override formats hint text
+  ariaLabel?: string; // accessibility label override
 }
 
 export function FileDrop({
@@ -26,6 +27,7 @@ export function FileDrop({
   multiple = false,
   emptyTitle,
   formatsHint,
+  ariaLabel = 'Agregar imagen de referencia',
 }: FileDropProps) {
   const onDrop = useCallback(
     (accepted: File[]) => {
@@ -59,9 +61,7 @@ export function FileDrop({
       <div className="inline-flex items-center justify-center rounded-full p-2 border border-foreground/20">
         <ImageIcon className="h-4 w-4 opacity-80" />
       </div>
-      <p className="text-sm font-medium">
-        {emptyTitleText}
-      </p>
+      <p className="text-sm font-medium">{emptyTitleText}</p>
       <p className="text-xs text-muted-foreground">
         o <span className="underline underline-offset-2">haz clic para seleccionar</span>
       </p>
@@ -129,7 +129,7 @@ export function FileDrop({
       data-filedrop-root
       role="button"
       tabIndex={0}
-      aria-label="Agregar imagen de referencia"
+      aria-label={ariaLabel}
       className={cn(
         'relative min-h-[180px] grid place-items-center rounded-2xl cursor-pointer select-none',
         'transition-all outline-dotted outline-4 outline-[#E5E5E5]',

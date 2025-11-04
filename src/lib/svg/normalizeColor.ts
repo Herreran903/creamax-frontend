@@ -44,7 +44,10 @@ export function parseFill(
     (typeof style.opacity === 'string' && style.opacity.trim().length > 0);
 
   if (hasFillOpacity) {
-    op = typeof style.fillOpacity === 'string' ? parseFloat(style.fillOpacity) : (style.fillOpacity as number);
+    op =
+      typeof style.fillOpacity === 'string'
+        ? parseFloat(style.fillOpacity)
+        : (style.fillOpacity as number);
   } else if (hasOpacity) {
     op = typeof style.opacity === 'string' ? parseFloat(style.opacity) : (style.opacity as number);
   }

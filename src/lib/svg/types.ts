@@ -21,12 +21,7 @@ export interface SvgProcessResult {
 
 export type DepthMap = Record<string, number>;
 
-export type SvgWorkerProgressStep =
-  | 'parse'
-  | 'group'
-  | 'simplify'
-  | 'boolean'
-  | 'done';
+export type SvgWorkerProgressStep = 'parse' | 'group' | 'simplify' | 'boolean' | 'done';
 
 export type SvgWorkerMessage =
   | {

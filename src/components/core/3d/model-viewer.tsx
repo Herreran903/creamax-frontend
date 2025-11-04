@@ -2,7 +2,7 @@
 
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei';
-import { STLLoader } from 'three-stdlib';
+import { STLLoader, OBJLoader } from 'three-stdlib';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { cn } from '@/lib/utils';
@@ -27,7 +27,36 @@ function CallOnReadyOnce({ onReady }: { onReady?: () => void }) {
   return null;
 }
 
-function SafeGLB({ url }: { url: string }) {
+/**
+ * Normalizes scale and centers any children to fit nicely in the viewer.
+ * Auto-fit using bounding box.
+ */
+function NormalizeGroup({ children }: { children: React.ReactNode }) {
+  const ref = useRef<THREE.Group>(null);
+  useEffect(() => {
+    const g = ref.current;
+    if (!g) return;
+    // Reset
+    g.scale.set(1, 1, 1);
+    g.position.set(0, 0, 0);
+
+    const box = new THREE.Box3().setFromObject(g);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const target = 1.6; // fits our camera well
+    const scale = target / maxDim;
+
+    g.scale.setScalar(scale);
+    g.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
+  }, [children]);
+  return <group ref={ref}>{children}</group>;
+}
+
+function GLBObject({ url }: { url: string }) {
   try {
     const { scene } = useGLTF(url);
     return <primitive object={scene} dispose={null} />;
@@ -36,7 +65,46 @@ function SafeGLB({ url }: { url: string }) {
   }
 }
 
-function SafeSTL({ url }: { url: string }) {
+function OBJObject({ url }: { url: string }) {
+  const [obj, setObj] = useState<THREE.Object3D | null>(null);
+
+  useEffect(() => {
+    const loader = new OBJLoader();
+    loader.load(
+      url,
+      (o) => {
+        // Fallback material for meshes lacking materials (no MTL provided)
+        o.traverse((child: any) => {
+          if ((child as THREE.Mesh)?.isMesh) {
+            const mesh = child as THREE.Mesh;
+            const hasMaterialArray = Array.isArray(mesh.material) && mesh.material.length > 0;
+            const hasMaterial = !!mesh.material || hasMaterialArray;
+            if (!hasMaterial) {
+              mesh.material = new THREE.MeshStandardMaterial({
+                color: '#cbd5e1',
+                metalness: 0.2,
+                roughness: 0.7,
+              });
+            }
+            // Ensure geometry has normals for correct shading
+            const g = mesh.geometry as THREE.BufferGeometry | undefined;
+            if (g && !g.attributes.normal) {
+              g.computeVertexNormals();
+            }
+          }
+        });
+        setObj(o);
+      },
+      undefined,
+      () => setObj(null)
+    );
+  }, [url]);
+
+  if (!obj) return null;
+  return <primitive object={obj} dispose={null} />;
+}
+
+function STLMesh({ url }: { url: string }) {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
 
   useEffect(() => {
@@ -52,7 +120,7 @@ function SafeSTL({ url }: { url: string }) {
   if (!geometry) return null;
 
   return (
-    <mesh geometry={geometry} scale={0.017} rotation={[0, Math.PI / 8, 0]}>
+    <mesh geometry={geometry}>
       <meshStandardMaterial color="#7dd3fc" metalness={0.3} roughness={0.4} />
     </mesh>
   );
@@ -83,7 +151,7 @@ export function ModelViewer({
 }) {
   const hasSrc = !!src;
   const ext = src?.split('.').pop()?.toLowerCase();
-  const [loadErr, setLoadErr] = useState(false);
+  const [loadErr] = useState(false);
 
   const showOverlay = !!overlayImage && (!hasSrc || preferOverlay);
   const show3D = hasSrc && !preferOverlay && !loadErr;
@@ -116,11 +184,27 @@ export function ModelViewer({
             <directionalLight position={[4, 4, 4]} intensity={0.8} />
 
             {!disableSpin ? (
-              <Spinning>{ext === 'stl' ? <SafeSTL url={src!} /> : <SafeGLB url={src!} />}</Spinning>
-            ) : ext === 'stl' ? (
-              <SafeSTL url={src!} />
+              <Spinning>
+                <NormalizeGroup>
+                  {ext === 'stl' ? (
+                    <STLMesh url={src!} />
+                  ) : ext === 'obj' ? (
+                    <OBJObject url={src!} />
+                  ) : (
+                    <GLBObject url={src!} />
+                  )}
+                </NormalizeGroup>
+              </Spinning>
             ) : (
-              <SafeGLB url={src!} />
+              <NormalizeGroup>
+                {ext === 'stl' ? (
+                  <STLMesh url={src!} />
+                ) : ext === 'obj' ? (
+                  <OBJObject url={src!} />
+                ) : (
+                  <GLBObject url={src!} />
+                )}
+              </NormalizeGroup>
             )}
 
             {!disableControls && (
