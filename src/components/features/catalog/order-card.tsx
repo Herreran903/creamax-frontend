@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Order } from '@/domain/types';
 import Link from 'next/link';
 
-export function OrderCard({ o, onOpen }: { o: Order; onOpen: (id: string) => void }) {
+export default function OrderCard({ o, onOpen }: { o: Order; onOpen: (id: string) => void }) {
   return (
     <Card className="flex flex-col">
       <CardHeader>

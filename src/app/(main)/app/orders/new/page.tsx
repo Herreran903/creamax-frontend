@@ -1,6 +1,6 @@
 'use client';
 
-import NewOrderWizard from '@/components/orders/new-order-wizard';
+import NewOrderWizard from '@/components/features/orders/order-wizard/new-order-wizard';
 import { OrderProvider } from '@/hooks/use-order';
 
 export default function Page() {

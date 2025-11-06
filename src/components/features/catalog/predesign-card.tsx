@@ -3,9 +3,9 @@
 
 import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { ModelViewer } from './core/3d/model-viewer';
 import { cn } from '@/lib/utils';
 import { ModelPredesign3D } from '@/domain/types';
+import { ModelViewer } from '@/components/shared';
 
 function triHash(key: string) {
   let sum = 0;

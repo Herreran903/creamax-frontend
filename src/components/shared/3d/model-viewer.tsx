@@ -7,7 +7,7 @@ import type { GLTF } from 'three-stdlib';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { cn } from '@/lib/utils';
-import { KeychainCircle, KeychainRect, KeychainSquare } from './keychan-meshes';
+import { KeychainCircle, KeychainRect, KeychainSquare } from './keychain-meshes';
 
 function Spinning({ children }: { children: React.ReactNode }) {
   const ref = useRef<THREE.Group>(null);
@@ -126,13 +126,13 @@ function STLMesh({ url }: { url: string }) {
   if (!geometry) return null;
 
   return (
-    <mesh geometry={geometry}>
+    <mesh geometry={geometry} scale={0.01}>
       <meshStandardMaterial color="#7dd3fc" metalness={0.3} roughness={0.4} />
     </mesh>
   );
 }
 
-export function ModelViewer({
+export default function ModelViewer({
   src,
   object,
   overlayImage,

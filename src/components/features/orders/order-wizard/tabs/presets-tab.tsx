@@ -1,12 +1,12 @@
 'use client';
 import * as React from 'react';
 import * as THREE from 'three';
-import PredesignCard from '@/components/predesign-card';
+import PredesignCard from '@/components/features/catalog/predesign-card';
 import { ModelPredesign3D } from '@/domain/types';
 import { Separator } from '@/components/ui/separator';
-import { CategoryItem } from '@/components/category-button';
 import { Boxes, KeyRound, Magnet } from 'lucide-react';
 import { useActiveModel } from '@/stores/active-model';
+import CategoryItem from '@/components/shared/inputs/category-button';
 
 export type PresetsTabProps = {
   presets: ModelPredesign3D[];

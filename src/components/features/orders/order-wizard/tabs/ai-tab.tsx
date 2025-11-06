@@ -2,15 +2,15 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { FileDrop } from '@/components/core/forms/file-drop';
+import { FileDrop } from '@/components/shared/forms/file-drop';
 import { Hammer, Image, TextInitial } from 'lucide-react';
 import { useTripoTask, MAX_WAIT_MS as MAX_WAIT_MS_EXPORT } from '@/hooks/use-tripo-task';
 import { Label } from '@/components/ui/label';
-import { StatusPanel } from '@/components/status-panel';
-import { PreviewStage } from '@/components/preview-stage';
 import { useActiveModel } from '@/stores/active-model';
 import { GLTFLoader } from 'three-stdlib';
 import * as THREE from 'three';
+import PreviewStage from '../preview-stage';
+import { StatusPanel } from '@/components/shared';
 
 export type AiTabProps = {};
 

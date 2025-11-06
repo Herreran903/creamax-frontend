@@ -1,4 +1,4 @@
-import NewOrderWizard from '@/components/orders/new-order-wizard';
+import NewOrderWizard from '@/components/features/orders/order-wizard/new-order-wizard';
 
 export default function Page() {
   return (

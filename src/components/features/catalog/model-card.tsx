@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Model3D } from '@/domain/types';
-import { ModelViewer } from './core/3d/model-viewer';
 import { cn, formatDate } from '@/lib/utils';
+import { ModelViewer } from '@/components/shared';
 
 function triHash(key: string) {
   let sum = 0;
@@ -11,7 +11,7 @@ function triHash(key: string) {
   return sum % 3;
 }
 
-export function ModelCard({
+export default function ModelCard({
   m,
   onOpen,
   className,

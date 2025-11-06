@@ -4,13 +4,12 @@ import * as React from 'react';
 import * as THREE from 'three';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { FileDrop } from '@/components/core/forms/file-drop';
-import { StatusPanel } from '@/components/status-panel';
-import { PreviewStage } from '@/components/preview-stage';
-import { Upload, FileType2, RefreshCw, FileDown } from 'lucide-react';
+import { FileDrop } from '@/components/shared/forms/file-drop';
+import { FileType2, RefreshCw, FileDown } from 'lucide-react';
 import { useUpload3DTask, MAX_3D_FILE_MB } from '@/hooks/use-upload3d-task';
 import { GLTFLoader, OBJLoader, STLLoader, GLTFExporter } from 'three-stdlib';
 import { useActiveModel } from '@/stores/active-model';
+import PreviewStage from '../preview-stage';
 
 export type Upload3DTabProps = {
   uploadedName: string | null;

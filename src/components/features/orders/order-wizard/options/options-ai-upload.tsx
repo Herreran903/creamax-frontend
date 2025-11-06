@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import ActiveModelViewer from '@/components/orders/active-model-viewer';
+import ActiveModelViewer from '@/components/features/orders/order-wizard/active-model-viewer';
 import { Package, FileText, Rss, Link2 } from 'lucide-react';
 
 export type OptionsAIUploadProps = {

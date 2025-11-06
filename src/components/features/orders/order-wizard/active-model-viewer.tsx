@@ -2,9 +2,9 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { ModelViewer } from '@/components/core/3d/model-viewer';
 import { useActiveModel } from '@/stores/active-model';
 import { Loader } from 'lucide-react';
+import { ModelViewer } from '@/components/shared';
 
 export default function ActiveModelViewer({ className }: { className?: string }) {
   const { state, reset } = useActiveModel();

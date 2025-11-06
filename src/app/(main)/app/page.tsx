@@ -2,12 +2,12 @@
 
 import { useRouter } from 'next/navigation';
 import { useModels } from '@/hooks/data';
-import { ModelCard } from '@/components/model-card';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
-import MetroToggle from '@/components/metro-toggle';
+import MetroToggle from '@/components/shared/inputs/metro-toggle';
+import { ModelCard } from '@/components/features/catalog';
 
 const options = ['Galería', 'En envío'];
 

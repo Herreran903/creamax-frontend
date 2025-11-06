@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { CheckCircle2, Loader2, AlertCircle, Clock } from 'lucide-react';
 
-export function StatusPanel({
+export default function StatusPanel({
   status,
   progress,
   error,

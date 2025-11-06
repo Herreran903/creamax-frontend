@@ -6,7 +6,7 @@ import { Upload } from 'lucide-react';
 import { useOrder } from '@/hooks/use-order';
 import { PRESETS } from '@/domain/types';
 
-export function BottomBar() {
+export default function BottomBar() {
   const o = useOrder();
   const fileRef = React.useRef<HTMLInputElement | null>(null);
 

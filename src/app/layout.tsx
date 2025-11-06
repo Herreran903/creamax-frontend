@@ -8,7 +8,7 @@ import {
   Bungee_Shade,
   Londrina_Shadow,
 } from 'next/font/google';
-import BgTopo from '@/components/bg-topo';
+import BgTopo from '@/components/shared/display/bg-topo';
 import './globals.css';
 
 export const plusJakarta = Plus_Jakarta_Sans({

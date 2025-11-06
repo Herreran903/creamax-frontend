@@ -3,9 +3,13 @@ import * as React from 'react';
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
-import { KeychainCircle, KeychainRect, KeychainSquare } from '@/components/core/3d/keychan-meshes';
+import {
+  KeychainCircle,
+  KeychainRect,
+  KeychainSquare,
+} from '@/components/shared/3d/keychain-meshes';
 import { cn } from '@/lib/utils';
-import TextureInlay from '../core/3d/texture-in-lay';
+import { TextureInlay } from '@/components/shared';
 
 export interface PresetModelViewerProps {
   className?: string;

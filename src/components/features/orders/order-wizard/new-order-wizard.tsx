@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import { useActiveModel } from '@/stores/active-model';
 import { useOrder } from '@/hooks/use-order';
 import QuoteReviewStep from './quote-review-step';
-import Options from './options';
+import Options from './options/options';
 
 function isValidUrl(s: string) {
   try {

@@ -1,15 +1,15 @@
 'use client';
 import * as React from 'react';
-import { SelectedMode } from './model-source-tabs';
 import { useOrder } from '@/hooks/use-order';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { FileDrop } from '@/components/core/forms/file-drop';
-import PresetModelViewer from '@/components/orders/preset-model-viewer';
+import { FileDrop } from '@/components/shared/forms/file-drop';
+import PresetModelViewer from '@/components/features/orders/order-wizard/preset-model-viewer';
 import { FileText, Rss, Link2, Image, Palette } from 'lucide-react';
-import ColorInput from '../color-input';
+import { SelectedMode } from '@/domain/types';
+import { ColorInput } from '@/components/shared';
 
 export type OptionsPresetsProps = {
   selectedMode: SelectedMode;

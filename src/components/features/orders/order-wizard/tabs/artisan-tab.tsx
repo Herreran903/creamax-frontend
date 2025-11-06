@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { FileDrop } from '@/components/core/forms/file-drop';
+import { FileDrop } from '@/components/shared/forms/file-drop';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw, Send } from 'lucide-react';
 import { toast } from 'sonner';

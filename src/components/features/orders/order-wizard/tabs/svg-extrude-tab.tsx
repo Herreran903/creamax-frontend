@@ -2,9 +2,8 @@
 
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { FileDrop } from '@/components/core/forms/file-drop';
-import { StatusPanel } from '@/components/status-panel';
-import SvgExtruder from '@/components/core/3d/svg-extruder';
+import { FileDrop } from '@/components/shared/forms/file-drop';
+import SvgExtruder from '@/components/shared/3d/svg-extruder';
 import type {
   DepthMap,
   SvgProcessResult,
@@ -17,6 +16,7 @@ import { Save, Settings2 } from 'lucide-react';
 import * as THREE from 'three';
 import { normalizeColor, parseFill } from '@/lib/svg/normalizeColor';
 import { useActiveModel } from '@/stores/active-model';
+import { StatusPanel } from '@/components/shared';
 
 // three GLTF exporter (runtime import inside handler to keep bundle light)
 type GLTFExporterType = typeof import('three/examples/jsm/exporters/GLTFExporter.js').GLTFExporter;
@@ -178,7 +178,7 @@ export default function SvgExtrudeTab({
 
       // IMPORTANT: Worker path resolved relatively to this file at build time
       const worker = new Worker(
-        new URL('../../../workers/svg-extrude.worker.ts', import.meta.url),
+        new URL('../../../../../workers/svg-extrude.worker.ts', import.meta.url),
         {
           type: 'module',
         }

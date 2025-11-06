@@ -1,5 +1,5 @@
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Button } from './ui/button';
 import * as React from 'react';
 
 type CategoryItemProps = {
@@ -11,7 +11,7 @@ type CategoryItemProps = {
   onClick?: () => void;
 };
 
-export function CategoryItem({
+export default function CategoryItem({
   icon: Icon,
   label,
   active = false,

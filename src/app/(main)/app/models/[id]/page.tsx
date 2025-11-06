@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { ModelViewer } from '@/components/core/3d/model-viewer';
+import { ModelViewer } from '@/components/shared/3d/model-viewer';
 
 type KindParam = 'square' | 'rect' | 'circle';
 
