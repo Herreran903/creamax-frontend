@@ -1,188 +1,310 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useModels } from '@/hooks/data';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { ModelViewer } from '@/components/shared';
+import { toast } from 'sonner';
+import { useNfcConfig, useUpdateNfcUrl, useWeeklyStatsForCode } from '@/hooks/nfc';
+import { validateNfcUrl } from '@/lib/api/nfc';
 
-type KindParam = 'square' | 'rect' | 'circle';
+// Simple responsive weekly bar chart using design tokens (no external chart lib)
+function WeeklyBarChart({
+  series,
+  ariaLabel,
+}: {
+  series: { date: string; count: number }[];
+  ariaLabel?: string;
+}) {
+  const max = Math.max(1, ...series.map((d) => d.count));
+  return (
+    <div className="w-full">
+      <div
+        className="grid grid-cols-7 items-end gap-2 h-44 sm:h-52"
+        role="img"
+        aria-label={ariaLabel ?? 'Gráfica semanal de interacciones'}
+      >
+        {series.map((d) => {
+          const hPct = Math.round((d.count / max) * 100);
+          return (
+            <div key={d.date} className="flex flex-col items-center gap-1">
+              <div
+                className="w-full rounded-md bg-primary/15 border border-primary/30"
+                style={{ height: `${Math.max(6, hPct)}%` }}
+                aria-valuemin={0}
+                aria-valuenow={d.count}
+                aria-valuemax={max}
+                role="meter"
+                aria-label={`Clicks ${d.count} el ${d.date}`}
+                title={`${d.date}: ${d.count}`}
+              />
+              <div className="text-[10px] text-muted-foreground tabular-nums">
+                {d.date.slice(5)}{/* MM-DD */}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 text-xs text-muted-foreground">Escala máxima: {max}</div>
+    </div>
+  );
+}
+
+function SectionSkeleton({ lines = 3 }: { lines?: number }) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: lines }).map((_, i) => (
+        <div key={i} className="h-4 w-full rounded-md bg-muted animate-pulse" />
+      ))}
+    </div>
+  );
+}
 
 export default function Page({ params }: { params: { id: string } }) {
   const r = useRouter();
-  const { data: models } = useModels();
   const id = params.id;
 
-  const model = useMemo(() => models?.find((m) => m.id === id), [models, id]);
+  // 1) Load NFC configuration immediately on mount
+  const {
+    data: cfg,
+    isLoading: cfgLoading,
+    isError: cfgIsError,
+    error: cfgError,
+  } = useNfcConfig(id);
 
-  function getModelUrl(m: { source: 'internal' | 'tripo'; fileUrl: string }) {
-    return m.source === 'tripo'
-      ? `/api/tripo/proxy?url=${encodeURIComponent(m.fileUrl)}`
-      : m.fileUrl;
+  // 2) Once resolved config, fetch weekly stats filtered by its short_code
+  const shortCode = cfg?.short_code;
+  const {
+    data: weekly,
+    isLoading: weeklyLoading,
+    isError: weeklyIsError,
+    error: weeklyError,
+  } = useWeeklyStatsForCode(shortCode);
+
+  const { series = [], total = 0, minDate = '', maxDate = '' } = weekly || {
+    series: [],
+    total: 0,
+    minDate: '',
+    maxDate: '',
+  };
+
+  // 3) Local state for URL editing
+  const [urlValue, setUrlValue] = useState('');
+  const [touched, setTouched] = useState(false);
+  const urlInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (cfg?.url_destino_actual) {
+      setUrlValue(cfg.url_destino_actual);
+    }
+  }, [cfg?.url_destino_actual]);
+
+  const { mutateAsync: doUpdate, isPending: isSaving } = useUpdateNfcUrl(id);
+
+  const urlValidation = useMemo(() => validateNfcUrl(urlValue), [urlValue]);
+  const urlInvalid = touched && !urlValidation.valid;
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setTouched(true);
+    const v = validateNfcUrl(urlValue);
+    if (!v.valid) {
+      toast.error(v.reason ?? 'URL inválida');
+      urlInputRef.current?.focus();
+      return;
+    }
+    try {
+      await doUpdate({ url_destino_actual: urlValue });
+      toast.success('URL actualizada correctamente');
+    } catch (err: any) {
+      const msg = err?.message || 'No se pudo actualizar el URL';
+      toast.error(msg);
+    }
   }
 
-  const [includeNFC, setIncludeNFC] = useState(true);
-  const [nfcUrl, setNfcUrl] = useState('');
-
-  // ROI inputs
-  const [scans, setScans] = useState(100);
-  const [convRate, setConvRate] = useState(3); // %
-  const [valuePerConv, setValuePerConv] = useState(5); // currency units
-
-  const cost = useMemo(() => {
-    // Estimado rápido: asumimos producto LLAVERO en esta vista
-    const base = 10;
-    const nfc = includeNFC ? 5 : 0;
-    return { amount: base + nfc, currency: 'USD' as const };
-  }, [includeNFC]);
-
-  const roi = useMemo(() => {
-    const income = scans * (convRate / 100) * valuePerConv;
-    const roiPct = cost.amount > 0 ? ((income - cost.amount) / cost.amount) * 100 : 0;
-    return { income, roiPct };
-  }, [scans, convRate, valuePerConv, cost.amount]);
-
-  function goCustomize() {
-    const params = new URLSearchParams();
-    params.set('modelId', id);
-    params.set('withNfc', includeNFC ? '1' : '0');
-    if (nfcUrl) params.set('nfc', nfcUrl);
-    if (model?.name) params.set('name', model.name);
-    r.push(`/app/orders/new/customize?${params.toString()}`);
-  }
+  const showCfgError = cfgIsError;
+  const showStatsError = weeklyIsError;
 
   return (
     <main className="p-0 mx-auto text-foreground">
-      <Card className="bg-white/70 backdrop-blur-md border border-white/60 shadow-xl">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-xl">Modelo {model?.name ?? id}</CardTitle>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">GALERÍA</Badge>
-            </div>
-          </div>
-        </CardHeader>
-        <Separator />
-        <CardContent className="pt-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="space-y-3">
-              <Label className="text-sm">Previsualización</Label>
-              <ModelViewer
-                className="h-[260px]"
-                src={model ? getModelUrl(model) : undefined}
-                demoKind={undefined}
-                overlayImage={model?.overlayImageUrl}
-                disableSpin
-                disableControls
-                autoRotate={false}
-              />
-              <p className="text-xs text-muted-foreground">
-                Vista estática del modelo seleccionado.
-              </p>
-
-              <div className="flex items-center justify-between gap-4 rounded-xl border px-3 py-2">
-                <div className="space-y-0.5">
-                  <Label className="text-sm">Incluir NFC</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Etiqueta NFC integrada en el producto.
-                  </p>
-                </div>
-                <Switch checked={includeNFC} onCheckedChange={setIncludeNFC} />
-              </div>
-
-              {includeNFC && (
-                <div className="space-y-2">
-                  <Label className="text-sm">URL de destino para NFC</Label>
-                  <Input
-                    placeholder="https://tusitio.com/campana"
-                    value={nfcUrl}
-                    onChange={(e) => setNfcUrl(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Este enlace se abrirá al escanear el NFC.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-sm">Métricas rápidas de ROI</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-xl border px-3 py-2">
-                    <p className="text-xs text-muted-foreground">Escaneos</p>
-                    <Input
-                      type="number"
-                      value={scans}
-                      onChange={(e) => setScans(Math.max(0, Number(e.target.value)))}
-                    />
-                  </div>
-                  <div className="rounded-xl border px-3 py-2">
-                    <p className="text-xs text-muted-foreground">Tasa conv. (%)</p>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      value={convRate}
-                      onChange={(e) => setConvRate(Math.max(0, Number(e.target.value)))}
-                    />
-                  </div>
-                  <div className="rounded-xl border px-3 py-2">
-                    <p className="text-xs text-muted-foreground">Valor/conv. ({cost.currency})</p>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={valuePerConv}
-                      onChange={(e) => setValuePerConv(Math.max(0, Number(e.target.value)))}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-xl border px-3 py-3">
-                  <p className="text-xs text-muted-foreground">Ingresos estimados</p>
-                  <p className="text-lg font-semibold">
-                    {roi.income.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
-                    {cost.currency}
-                  </p>
-                </div>
-                <div className="rounded-xl border px-3 py-3">
-                  <p className="text-xs text-muted-foreground">Costo estimado</p>
-                  <p className="text-lg font-semibold">
-                    {cost.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
-                    {cost.currency}
-                  </p>
-                </div>
-                <div className="rounded-xl border px-3 py-3">
-                  <p className="text-xs text-muted-foreground">ROI</p>
-                  <p
-                    className={`text-lg font-semibold ${roi.roiPct >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
-                  >
-                    {roi.roiPct.toLocaleString(undefined, { maximumFractionDigits: 1 })}%
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                Las métricas son estimaciones simples para apoyar decisiones. Ajusta los valores
-                según tu negocio.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter className="flex items-center justify-end gap-2">
-          <Button variant="secondary" onClick={() => r.back()}>
+      {/* Page header */}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">Modelo {id}</h1>
+          {shortCode ? <Badge variant="secondary">short_code: {shortCode}</Badge> : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => r.back()} aria-label="Volver">
             Volver
           </Button>
-          <Button onClick={goCustomize}>Personalizar y pedir</Button>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Column 1-2: Config + Stats */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Configuración */}
+          <Card className="bg-white/70 backdrop-blur-md border border-white/60 shadow-xl">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-lg">Configuración NFC</CardTitle>
+                <Badge variant="secondary">/api/v1/nfc/config/:id</Badge>
+              </div>
+            </CardHeader>
+            <Separator />
+            <CardContent className="pt-4">
+              {cfgLoading && <SectionSkeleton lines={4} />}
+
+              {showCfgError && (
+                <div
+                  className="rounded-md border border-red-300 bg-red-50 text-red-700 p-3 text-sm"
+                  role="alert"
+                >
+                  {cfgError instanceof Error
+                    ? cfgError.message
+                    : 'Error al cargar la configuración'}
+                </div>
+              )}
+
+              {!cfgLoading && !showCfgError && cfg && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-xl border p-3">
+                    <div className="text-xs text-muted-foreground">NFC ID</div>
+                    <div className="text-base font-semibold">{cfg.nfc_id}</div>
+                  </div>
+                  <div className="rounded-xl border p-3">
+                    <div className="text-xs text-muted-foreground">Item ID</div>
+                    <div className="text-base font-semibold">{cfg.item_id}</div>
+                  </div>
+                  <div className="rounded-xl border p-3 sm:col-span-2">
+                    <div className="text-xs text-muted-foreground">URL de destino actual</div>
+                    <div className="text-base font-semibold break-all">{cfg.url_destino_actual}</div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Estadísticas */}
+          <Card className="bg-white/70 backdrop-blur-md border border-white/60 shadow-xl">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-lg">Estadísticas semanales</CardTitle>
+                <Badge variant="secondary">/api/v1/nfc/stats/weekly</Badge>
+              </div>
+            </CardHeader>
+            <Separator />
+            <CardContent className="pt-4">
+              {weeklyLoading && <SectionSkeleton lines={5} />}
+
+              {showStatsError && (
+                <div
+                  className="rounded-md border border-red-300 bg-red-50 text-red-700 p-3 text-sm"
+                  role="alert"
+                >
+                  {weeklyError instanceof Error
+                    ? weeklyError.message
+                    : 'Error al cargar estadísticas'}
+                </div>
+              )}
+
+              {!weeklyLoading && !showStatsError && (
+                <>
+                  {series.length === 0 ? (
+                    <div
+                      className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      Sin datos en la última semana
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <WeeklyBarChart
+                        series={series}
+                        ariaLabel={`Clicks del short_code ${shortCode}`}
+                      />
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-xl border px-3 py-3">
+                          <p className="text-xs text-muted-foreground">Total semana</p>
+                          <p className="text-lg font-semibold tabular-nums">{total}</p>
+                        </div>
+                        <div className="rounded-xl border px-3 py-3">
+                          <p className="text-xs text-muted-foreground">Desde</p>
+                          <p className="text-lg font-semibold tabular-nums">
+                            {minDate || '-'}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border px-3 py-3">
+                          <p className="text-xs text-muted-foreground">Hasta</p>
+                          <p className="text-lg font-semibold tabular-nums">
+                            {maxDate || '-'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Column 3: Edit URL */}
+        <div className="space-y-6">
+          <Card className="bg-white/70 backdrop-blur-md border border-white/60 shadow-xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Editar URL de destino</CardTitle>
+            </CardHeader>
+            <Separator />
+            <CardContent className="pt-4">
+              <form className="space-y-3" onSubmit={onSubmit} noValidate>
+                <div className="space-y-2">
+                  <Label htmlFor="nfc-url">URL</Label>
+                  <Input
+                    id="nfc-url"
+                    ref={urlInputRef}
+                    value={urlValue}
+                    onChange={(e) => setUrlValue(e.target.value)}
+                    onBlur={() => setTouched(true)}
+                    placeholder="https://ejemplo.com/campana"
+                    inputMode="url"
+                    aria-invalid={urlInvalid}
+                    aria-describedby={urlInvalid ? 'url-error' : undefined}
+                  />
+                  {urlInvalid ? (
+                    <div id="url-error" className="text-xs text-red-600">
+                      {urlValidation.reason}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Solo protocolos http y https permitidos.
+                    </p>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button
+                    type="submit"
+                    disabled={isSaving || !cfg || !urlValue}
+                    aria-busy={isSaving}
+                  >
+                    {isSaving ? 'Guardando…' : 'Guardar cambios'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+            <CardFooter className="pt-0">
+              <div className="text-xs text-muted-foreground">
+                Al guardar, se actualiza únicamente el campo url_destino_actual.
+              </div>
+            </CardFooter>
+          </Card>
+        </div>
+      </div>
     </main>
   );
 }
