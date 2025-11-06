@@ -134,9 +134,9 @@ export default function AiTab(_props: AiTabProps) {
   const dropPreview = imagePreview ?? (imageUrl ? imageUrl : null);
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-1">
+    <div className="h-full">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="md:col-span-2">
           <div className="rounded-xl border-2 border-border bg-white p-4 h-full space-y-6">
             <div className="space-y-2">
               <Label

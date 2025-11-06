@@ -4,7 +4,7 @@ import { ModelPredesign3D } from '@/domain/types';
 import PresetsTab from './tabs/presets-tab';
 import Upload3DTab from './tabs/upload3d-tab';
 import ArtisanTab from './tabs/artisan-tab';
-import AiTab from './tabs/ai-table';
+import AiTab from './tabs/ai-tab';
 
 import type { ModelSourceTab, SelectedMode } from '@/domain/types';
 import SvgExtrudeTab from './tabs/svg-extrude-tab';
@@ -12,7 +12,7 @@ export type { ModelSourceTab, SelectedMode } from '@/domain/types';
 
 export const PRESETS: ModelPredesign3D[] = [
   {
-    id: '1',
+    id: 'square',
     name: 'Llavero Cuadrado',
     kind: 'square',
     category: 'keychain',
@@ -20,7 +20,7 @@ export const PRESETS: ModelPredesign3D[] = [
     source: 'internal',
   },
   {
-    id: '2',
+    id: 'rect',
     name: 'Llavero Rectangular',
     kind: 'rect',
     category: 'keychain',
@@ -28,7 +28,7 @@ export const PRESETS: ModelPredesign3D[] = [
     source: 'internal',
   },
   {
-    id: '3',
+    id: 'circle',
     name: 'Llavero Circular',
     kind: 'circle',
     category: 'keychain',

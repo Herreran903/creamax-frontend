@@ -82,3 +82,81 @@ export type QuoteData = {
   estimateDays: number;
   modelOnly?: boolean;
 };
+
+/**
+ * Contract additions for Step 2 payload
+ */
+export type ModelFormat = 'glb' | 'gltf' | 'obj' | 'stl' | 'procedural';
+
+export interface ModelCharacteristics {
+  name?: string;
+  format: ModelFormat;
+  triangles?: number;
+  materials?: number;
+  sizeMB?: number;
+  /**
+   * Source where model was obtained from (AI, SVG, upload, preset).
+   */
+  source: 'ai' | 'svg' | 'upload' | 'preset';
+  createdAt: number; // epoch ms
+  /**
+   * Optional canonical URL for the 3D asset.
+   * - AI: proxied GLB url (/api/tripo/proxy?url=...)
+   * - UPLOAD3D: object URL (best-effort, mainly for client reference)
+   * - PRESETS/SVG: could be a generated download URL if available
+   */
+  url?: string | null;
+}
+
+export type NFCPrefs = {
+  include: boolean;
+  url?: string;
+};
+
+export type NewOrderPayload = {
+  productType: ProductType;
+  mode: SelectedMode;
+  description?: string;
+  /**
+   * Quantity when applicable (AI/UPLOAD3D/PRESETS/SVG). ARTESANAL defaults to 1.
+   */
+  quantity?: number;
+
+  /**
+   * New NFC contract shape (kept alongside legacy includeNFC/nfcUrl for compatibility).
+   */
+  nfc: NFCPrefs;
+
+  /**
+   * Model technical details (triangles, materials, size, format, source, url).
+   * Present when a model already exists in step 2 (AI/UPLOAD3D/PRESETS/SVG).
+   */
+  model?: ModelCharacteristics;
+
+  /**
+   * AI-specific references to link the generated asset.
+   */
+  ai?: {
+    taskId?: string | null;
+    glbUrl?: string | null;
+    previewUrl?: string | null;
+  };
+
+  /**
+   * PRESETS-specific reference (if applicable).
+   */
+  presetId?: string | null;
+
+  /**
+   * Optional SVG reference name (if applicable).
+   */
+  svgName?: string | null;
+
+  /**
+   * Quote information returned by /api/quote used for checkout continuity.
+   */
+  quote?: QuoteData;
+
+  status: 'PENDIENTE_REVISION' | 'COTIZADO' | 'APROBADO' | 'PRODUCCION' | 'ENVIADO';
+  createdAt: string; // ISO date string
+};

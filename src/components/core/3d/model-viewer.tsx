@@ -1,6 +1,6 @@
 'use client';
 
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei';
 import { STLLoader, OBJLoader } from 'three-stdlib';
 import type { GLTF } from 'three-stdlib';
@@ -11,33 +11,34 @@ import { KeychainCircle, KeychainRect, KeychainSquare } from './keychan-meshes';
 
 function Spinning({ children }: { children: React.ReactNode }) {
   const ref = useRef<THREE.Group>(null);
-  useFrame((_s, dt) => {
-    if (ref.current) ref.current.rotation.y += dt * 0.1;
-  });
+  useEffect(() => {
+    let raf: number;
+    const animate = (t: number) => {
+      if (ref.current) ref.current.rotation.y += 0.000001 * 60;
+      raf = requestAnimationFrame(animate);
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, []);
   return <group ref={ref}>{children}</group>;
 }
 
 function CallOnReadyOnce({ onReady }: { onReady?: () => void }) {
   const called = useRef(false);
-  useFrame(() => {
+  useEffect(() => {
     if (!called.current) {
       called.current = true;
       onReady?.();
     }
-  });
+  }, [onReady]);
   return null;
 }
 
-/**
- * Normalizes scale and centers any children to fit nicely in the viewer.
- * Auto-fit using bounding box.
- */
 function NormalizeGroup({ children }: { children: React.ReactNode }) {
   const ref = useRef<THREE.Group>(null);
   useEffect(() => {
     const g = ref.current;
     if (!g) return;
-    // Reset
     g.scale.set(1, 1, 1);
     g.position.set(0, 0, 0);
 
@@ -48,7 +49,7 @@ function NormalizeGroup({ children }: { children: React.ReactNode }) {
     box.getCenter(center);
 
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
-    const target = 1.6; // fits our camera well
+    const target = 1.6;
     const scale = target / maxDim;
 
     g.scale.setScalar(scale);
@@ -58,28 +59,26 @@ function NormalizeGroup({ children }: { children: React.ReactNode }) {
 }
 
 function GLBObject({ url }: { url: string }) {
-  try {
-    const { scene } = useGLTF(url);
-    return <primitive object={scene} dispose={null} />;
-  } catch {
-    return null;
-  }
+  const { scene } = useGLTF(url) as GLTF;
+  return <primitive object={scene} dispose={null} />;
 }
 
 function OBJObject({ url }: { url: string }) {
   const [obj, setObj] = useState<THREE.Object3D | null>(null);
 
   useEffect(() => {
+    let disposed = false;
     const loader = new OBJLoader();
     loader.load(
       url,
       (o) => {
-        // Fallback material for meshes lacking materials (no MTL provided)
+        if (disposed) return;
         o.traverse((child: any) => {
           if ((child as THREE.Mesh)?.isMesh) {
             const mesh = child as THREE.Mesh;
-            const hasMaterialArray = Array.isArray(mesh.material) && mesh.material.length > 0;
-            const hasMaterial = !!mesh.material || hasMaterialArray;
+            const hasMaterial =
+              !!mesh.material ||
+              (Array.isArray(mesh.material) && (mesh.material as THREE.Material[])?.length > 0);
             if (!hasMaterial) {
               mesh.material = new THREE.MeshStandardMaterial({
                 color: '#cbd5e1',
@@ -87,11 +86,8 @@ function OBJObject({ url }: { url: string }) {
                 roughness: 0.7,
               });
             }
-            // Ensure geometry has normals for correct shading
             const g = mesh.geometry as THREE.BufferGeometry | undefined;
-            if (g && !g.attributes.normal) {
-              g.computeVertexNormals();
-            }
+            if (g && !g.attributes.normal) g.computeVertexNormals();
           }
         });
         setObj(o);
@@ -99,6 +95,9 @@ function OBJObject({ url }: { url: string }) {
       undefined,
       () => setObj(null)
     );
+    return () => {
+      disposed = true;
+    };
   }, [url]);
 
   if (!obj) return null;
@@ -109,13 +108,19 @@ function STLMesh({ url }: { url: string }) {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
 
   useEffect(() => {
+    let disposed = false;
     const loader = new STLLoader();
     loader.load(
       url,
-      (geom) => setGeometry(geom),
+      (geom) => {
+        if (!disposed) setGeometry(geom);
+      },
       undefined,
       () => setGeometry(null)
     );
+    return () => {
+      disposed = true;
+    };
   }, [url]);
 
   if (!geometry) return null;
@@ -155,7 +160,7 @@ export function ModelViewer({
   const hasSrc = !!src;
   const hasObject = !!object;
   const ext = src?.split('.').pop()?.toLowerCase();
-  const [loadErr] = useState(false);
+  const loadErr = false;
 
   const showOverlay = !!overlayImage && (!(hasSrc || hasObject) || preferOverlay);
   const show3D = (hasSrc || hasObject) && !preferOverlay && !loadErr;
@@ -165,7 +170,7 @@ export function ModelViewer({
       className={cn(
         'relative overflow-hidden rounded-xl border border-white/40 dark:border-white/10',
         'bg-[#F2F2F2]',
-        'w-full h-[200px]',
+        'w-full h-full min-h-[200px]',
         className
       )}
     >
@@ -245,7 +250,6 @@ export function ModelViewer({
           <Canvas camera={{ position: [2, 1.8, 2], fov: 45 }}>
             <ambientLight intensity={0.3} />
             <directionalLight position={[4, 4, 4]} intensity={0.8} />
-
             {demoKind === 'circle' ? (
               <KeychainCircle scale={2} />
             ) : demoKind === 'rect' ? (
@@ -256,6 +260,7 @@ export function ModelViewer({
           </Canvas>
         </div>
       )}
+
       {showOverlay && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
           <img
@@ -263,11 +268,6 @@ export function ModelViewer({
             alt="overlay"
             className="max-w-[70%] max-h-[70%] opacity-80 rounded-lg shadow-md"
           />
-        </div>
-      )}
-      {loadErr && (
-        <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground/80 bg-white/80 dark:bg-black/50 backdrop-blur-sm">
-          Modelo no encontrado
         </div>
       )}
     </div>

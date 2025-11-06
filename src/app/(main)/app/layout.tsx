@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, Variants } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
@@ -9,7 +9,6 @@ import { Home, Plus } from 'lucide-react';
 import { ActiveModelProvider } from '@/stores/active-model';
 
 const easeCreamax: [number, number, number, number] = [0.25, 0.1, 0.25, 1];
-
 const brandLetters = 'CREAMAX'.split('');
 
 const letterVar: Variants = {
@@ -19,11 +18,7 @@ const letterVar: Variants = {
     rotate: [0, -2, 1, 0],
     scaleX: [1, 1.03, 0.98, 1],
     scaleY: [1, 0.96, 1.02, 1],
-    transition: {
-      duration: 0.55,
-      ease: [0.45, 0, 0.25, 1],
-      delay: i * 0.035,
-    },
+    transition: { duration: 0.55, ease: [0.45, 0, 0.25, 1], delay: i * 0.035 },
   }),
 };
 
@@ -60,10 +55,14 @@ function BrandTitle() {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const r = useRouter();
+  const pathname = usePathname();
+
+  const isHome = pathname === '/app' || pathname === '/app/';
+  const isNewOrder = pathname?.startsWith('/app/orders/new');
 
   return (
     <ActiveModelProvider>
-      <div className="min-h-screen font-sans text-foreground bg-background">
+      <div className="min-h-screen h-full font-sans text-foreground bg-background">
         <motion.header
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0, transition: { duration: 0.35, ease: easeCreamax } }}
@@ -82,34 +81,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </motion.button>
 
           <nav className="flex items-center gap-3">
-            <Button
-              onClick={() => r.push('/app/orders/new')}
-              aria-label="Nuevo pedido"
-              className="
-              rounded-xl
-              px-6 py-7
-              text-base font-extrabold
-              text-white
-              bg-[#FF4D00]
-            "
-              variant="default"
-            >
-              <Plus size={20} strokeWidth={5} />
-              <span>NUEVO PEDIDO</span>
-            </Button>
-            <Button
-              onClick={() => r.push('/app')}
-              aria-label="Ir al inicio"
-              className="
-              px-5 py-7
-              rounded-xl
-              border-2 border-foreground/40 
-              bg-background/70 
-              text-foreground 
-            "
-            >
-              <Home size={24} strokeWidth={2.5} />
-            </Button>
+            {/* Ocultar "Nuevo pedido" cuando estamos en /app/orders/new */}
+            {!isNewOrder && (
+              <Button
+                onClick={() => r.push('/app/orders/new')}
+                aria-label="Nuevo pedido"
+                className="rounded-xl px-6 py-7 text-base font-extrabold text-white bg-[#FF4D00]"
+                variant="default"
+              >
+                <Plus size={20} strokeWidth={5} />
+                <span>NUEVO PEDIDO</span>
+              </Button>
+            )}
+
+            {/* Ocultar "Home" cuando estamos en /app */}
+            {!isHome && (
+              <Button
+                onClick={() => r.push('/app')}
+                aria-label="Ir al inicio"
+                className="px-5 py-7 rounded-xl border-2 border-foreground/40 bg-background/70 text-foreground"
+              >
+                <Home size={24} strokeWidth={2.5} />
+              </Button>
+            )}
+
             <motion.div
               whileHover={{ y: -1, boxShadow: '0 10px 24px rgba(0,0,0,0.12)' }}
               whileTap={{ scale: 0.98 }}

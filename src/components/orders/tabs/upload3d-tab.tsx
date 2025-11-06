@@ -297,8 +297,8 @@ export default function Upload3DTab({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-1">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="md:col-span-2">
           <div className="rounded-xl border-2 border-border bg-white p-4 h-full space-y-5">
             <div className="space-y-2">
               <Label className="text-xs font-bold tracking-wide text-foreground/80 flex">
@@ -331,26 +331,6 @@ export default function Upload3DTab({
               )}
             </div>
             <div className="space-y-2">
-              <Button
-                onClick={() => {
-                  onValueChange('upload3d');
-                  setSelectedMode('UPLOAD3D');
-                }}
-                disabled={!showReady}
-                className="
-      w-full
-      rounded-xl
-      px-5 py-5
-      text-base font-extrabold
-      text-white
-      bg-[#FF4D00]
-      disabled:opacity-50 disabled:cursor-not-allowed
-    "
-                aria-label="Usar este modelo"
-              >
-                <Upload size={20} strokeWidth={3} />
-                USAR ESTE MODELO
-              </Button>
               {url ? (
                 <div className="grid grid-cols-2 gap-2">
                   <Button
@@ -376,23 +356,6 @@ export default function Upload3DTab({
                 </div>
               ) : null}
             </div>
-
-            <StatusPanel
-              status={
-                status === null
-                  ? null
-                  : status === 'PENDING'
-                    ? 'PENDING'
-                    : status === 'RUNNING'
-                      ? 'RUNNING'
-                      : status === 'SUCCEEDED'
-                        ? 'SUCCEEDED'
-                        : 'FAILED'
-              }
-              progress={typeof progress === 'number' ? progress : null}
-              error={error ?? null}
-              taskId={null}
-            />
           </div>
         </div>
         <div className="md:col-span-2">
