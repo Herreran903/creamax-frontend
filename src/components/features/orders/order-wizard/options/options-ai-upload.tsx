@@ -1,6 +1,5 @@
 'use client';
 import * as React from 'react';
-import { SelectedMode } from './model-source-tabs';
 import { useOrder } from '@/hooks/use-order';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -8,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import ActiveModelViewer from '@/components/features/orders/order-wizard/active-model-viewer';
 import { Package, FileText, Rss, Link2 } from 'lucide-react';
+import { SelectedMode } from '@/domain/types';
 
 export type OptionsAIUploadProps = {
   selectedMode: SelectedMode;
@@ -33,7 +33,6 @@ export default function OptionsAIUpload({ notes, setNotes }: OptionsAIUploadProp
   const o = useOrder();
   const nfcUrlInvalid = o.includeNfc && !isValidUrl(o.nfcUrl);
 
-  // UI-only selector (igual que antes)
   const [productType, setProductType] = React.useState<'LLAVERO' | 'IMAN' | 'OTROS'>('LLAVERO');
 
   return (

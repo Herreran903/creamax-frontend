@@ -1,5 +1,5 @@
 'use client';
-import { SelectedMode } from './model-source-tabs';
+import { SelectedMode } from '@/domain/types';
 import OptionsAIUpload from './options-ai-upload';
 import OptionsPresets from './options-presets';
 

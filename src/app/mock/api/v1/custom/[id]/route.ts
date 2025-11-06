@@ -1,0 +1,61 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+function withCors(res: NextResponse) {
+  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.headers.set(k, v));
+  return res;
+}
+
+const FIXED_QUOTE = {
+  id: 42,
+  nombre_personalizado: 'Llavero Marketing 2025',
+  fecha_creacion: '2025-10-15T10:00:00Z',
+  moneda: 'CLP',
+  cotizacion_rango: {
+    cotizacion_min: 4000,
+    cotizacion_max: 6000,
+  },
+  desglose: {
+    material: 2500,
+    mano_obra: 1200,
+    energia: 300,
+    acabado: 0,
+  },
+  tiempo_entrega_dias: 5,
+  valida_hasta: '2025-10-22T10:00:00Z',
+  notas: 'Valores estimados sujetos a revisión técnica.',
+};
+
+export async function OPTIONS() {
+  const res = new NextResponse(null, { status: 204 });
+  return withCors(res);
+}
+
+export async function GET(_req: NextRequest, ctx: { params: { id: string } }) {
+  // Simulated latency 300–800 ms
+  const delay = 300 + Math.floor(Math.random() * 501);
+  await new Promise((r) => setTimeout(r, delay));
+
+  const { id } = ctx.params;
+  if (String(id) === String(FIXED_QUOTE.id)) {
+    const res = NextResponse.json(FIXED_QUOTE, { status: 200 });
+    return withCors(res);
+  }
+
+  const res = NextResponse.json(
+    {
+      error: {
+        codigo: 'NOT_FOUND',
+        mensaje: 'Cotización no encontrada',
+        detalles: { id },
+      },
+    },
+    { status: 404 }
+  );
+  return withCors(res);
+}

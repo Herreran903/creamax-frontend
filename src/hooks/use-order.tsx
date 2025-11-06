@@ -72,8 +72,26 @@ type Ctx = {
   notes: string;
   setNotes: (s: string) => void;
 
+  /**
+   * If a texture image was selected in presets, store its URL for contract building.
+   */
+  textureImageUrl: string | null;
+  setTextureImageUrl: (u: string | null) => void;
+
   quoteData: QuoteData | null;
   setQuoteData: (q: QuoteData | null) => void;
+  /**
+   * Full API quote response from POST /api/v1/custom/create
+   * Persisted for later steps reuse.
+   */
+  quoteResponse: any | null;
+  setQuoteResponse: (q: any | null) => void;
+
+  /**
+   * When PRESETS is built from an SVG, keep the raw SVG text to send in the contract.
+   */
+  svgText: string | null;
+  setSvgText: (s: string | null) => void;
 
   // flags
   isPresets: boolean;
@@ -118,7 +136,10 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [nfcUrl, setNfcUrl] = React.useState('');
   const [quantity, setQuantity] = React.useState<number>(50);
   const [notes, setNotes] = React.useState('');
+  const [textureImageUrl, setTextureImageUrl] = React.useState<string | null>(null);
   const [quoteData, setQuoteData] = React.useState<QuoteData | null>(null);
+  const [quoteResponse, setQuoteResponse] = React.useState<any | null>(null);
+  const [svgText, setSvgText] = React.useState<string | null>(null);
 
   const isPresets = selectedMode === 'PRESETS';
   const isAI = selectedMode === 'AI';
@@ -205,6 +226,12 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     setNotes,
     quoteData,
     setQuoteData,
+    textureImageUrl,
+    setTextureImageUrl,
+    quoteResponse,
+    setQuoteResponse,
+    svgText,
+    setSvgText,
     isPresets,
     isAI,
     isUpload3D,

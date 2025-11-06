@@ -1,11 +1,12 @@
 import { useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, type FileRejection } from 'react-dropzone';
 import { cn } from '@/lib/utils';
 import { Image as ImageIcon, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export interface FileDropProps {
   onFiles: (files: File[]) => void;
+  onRejected?: (errors: FileRejection[]) => void;
   previewUrl?: string | null;
   uploading?: boolean;
   onClear?: () => void;
@@ -19,6 +20,7 @@ export interface FileDropProps {
 
 export function FileDrop({
   onFiles,
+  onRejected,
   previewUrl,
   uploading = false,
   onClear,
@@ -39,6 +41,7 @@ export function FileDrop({
 
   const { getRootProps, getInputProps, isDragActive, isFocused } = useDropzone({
     onDrop,
+    onDropRejected: onRejected,
     accept,
     multiple,
   });

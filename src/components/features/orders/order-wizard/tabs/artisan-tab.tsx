@@ -27,7 +27,7 @@ const MAX_IMAGE_MB = 10;
 export default function ArtisanTab({
   artisanDescription,
   setArtisanDescription,
-  artisanImageUrls: _artisanImageUrls, // not used directly; we manage local state
+  artisanImageUrls: _artisanImageUrls,
   setArtisanImageUrls,
 }: ArtisanTabProps) {
   const [images, setImages] = React.useState<LocalImage[]>([]);
@@ -37,7 +37,6 @@ export default function ArtisanTab({
     return () => {
       images.forEach((img) => URL.revokeObjectURL(img.url));
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onDropArtisanImages = (files: File[]) => {
@@ -99,9 +98,8 @@ export default function ArtisanTab({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Left panel: description + dropzone + thumbnails */}
+    <div className="h-full">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
         <div className="md:col-span-2">
           <div className="rounded-xl border-2 border-border bg-white p-4 h-full space-y-6">
             <div className="space-y-2">
@@ -180,8 +178,6 @@ export default function ArtisanTab({
                 </div>
               )}
             </div>
-
-            {/* Sticky actions */}
             <div className="sticky bottom-0 pt-2">
               <div className="flex items-center justify-end gap-2">
                 <Button

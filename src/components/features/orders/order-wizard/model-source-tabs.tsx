@@ -7,7 +7,6 @@ import ArtisanTab from './tabs/artisan-tab';
 import AiTab from './tabs/ai-tab';
 
 import type { ModelSourceTab, SelectedMode } from '@/domain/types';
-import SvgExtrudeTab from './tabs/svg-extrude-tab';
 export type { ModelSourceTab, SelectedMode } from '@/domain/types';
 
 export const PRESETS: ModelPredesign3D[] = [
@@ -52,7 +51,6 @@ export type ModelSourceTabsProps = {
   setArtisanDescription: (s: string) => void;
   artisanImageUrls: string[];
   setArtisanImageUrls: (f: (prev: string[]) => string[]) => void;
-  onSvgReadyChange?: (ready: boolean) => void;
 };
 
 export default function ModelSourceTabs({
@@ -70,7 +68,6 @@ export default function ModelSourceTabs({
   setArtisanDescription,
   artisanImageUrls,
   setArtisanImageUrls,
-  onSvgReadyChange,
 }: ModelSourceTabsProps) {
   return (
     <Tabs
@@ -82,7 +79,6 @@ export default function ModelSourceTabs({
         <TabsTrigger value="presets">Prediseñados</TabsTrigger>
         <TabsTrigger value="ai">Generado con IA</TabsTrigger>
         <TabsTrigger value="upload3d">Subir 3D</TabsTrigger>
-        <TabsTrigger value="svg">SVG → 3D</TabsTrigger>
         <TabsTrigger value="artisanal">Artesanal</TabsTrigger>
       </TabsList>
 
@@ -98,14 +94,6 @@ export default function ModelSourceTabs({
 
       <TabsContent value="ai">
         <AiTab />
-      </TabsContent>
-
-      <TabsContent value="svg">
-        <SvgExtrudeTab
-          setSelectedMode={setSelectedMode}
-          onValueChange={onValueChange}
-          onReadyChange={onSvgReadyChange}
-        />
       </TabsContent>
 
       <TabsContent value="upload3d">
