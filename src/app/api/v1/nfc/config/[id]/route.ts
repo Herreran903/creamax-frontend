@@ -34,9 +34,9 @@ export async function OPTIONS() {
   return withCors(res);
 }
 
-export async function GET(_req: NextRequest, ctx: { params: { id: string } }) {
+export async function GET(_req: NextRequest, ctx: any) {
   try {
-    const { id } = ctx.params;
+    const { id } = await ctx?.params;
 
     // Simulated latency 200–600 ms
     const delay = 200 + Math.floor(Math.random() * 401);
@@ -68,9 +68,9 @@ export async function GET(_req: NextRequest, ctx: { params: { id: string } }) {
   }
 }
 
-export async function PUT(req: NextRequest, ctx: { params: { id: string } }) {
+export async function PUT(req: NextRequest, ctx: any) {
   try {
-    const { id } = ctx.params;
+    const { id } = await ctx?.params;
     const body = (await req.json().catch(() => ({}))) as Partial<NfcConfigRaw>;
 
     if (!STORE.has(String(id))) {

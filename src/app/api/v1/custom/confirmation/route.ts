@@ -6,7 +6,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-const API_BASE_URL = process.env.API_BASE_URL;
+const API_BASE_URL = (process.env.NEXT_URL_BACKEND ?? process.env.API_BASE_URL ?? '').replace(/\/+$/, '');
 
 const BACKEND_URL = `${API_BASE_URL}/custom/confirmation`; 
 
@@ -31,7 +31,15 @@ export async function POST(req: NextRequest) {
       );
       return withCors(res);
     }
-
+ 
+    if (!API_BASE_URL) {
+      const res = NextResponse.json(
+        { error: { codigo: 'CONFIG_ERROR', mensaje: 'API_BASE_URL no configurada' } },
+        { status: 500 }
+      );
+      return withCors(res);
+    }
+ 
     const backendResponse = await fetch(BACKEND_URL, {
       method: 'POST',
       headers: {

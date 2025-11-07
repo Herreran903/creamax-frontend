@@ -36,12 +36,12 @@ export async function OPTIONS() {
   return withCors(res);
 }
 
-export async function GET(_req: NextRequest, ctx: { params: { id: string } }) {
+export async function GET(_req: NextRequest, ctx: any) {
   // Simulated latency 300–800 ms
   const delay = 300 + Math.floor(Math.random() * 501);
   await new Promise((r) => setTimeout(r, delay));
 
-  const { id } = ctx.params;
+  const { id } = await ctx?.params;
   if (String(id) === String(FIXED_QUOTE.id)) {
     const res = NextResponse.json(FIXED_QUOTE, { status: 200 });
     return withCors(res);
