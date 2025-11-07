@@ -6,7 +6,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-const API_BASE_URL = process.env.API_BASE_URL;
+const API_BASE_URL = (process.env.NEXT_URL_BACKEND ?? process.env.API_BASE_URL ?? '').replace(/\/+$/, '');
 
 const BACKEND_URL = `${API_BASE_URL}/custom/create`; 
 
@@ -26,12 +26,17 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     
     // 2. Reenviar la solicitud al backend FastAPI/Python
+    if (!API_BASE_URL) {
+      const res = NextResponse.json(
+        { error: { codigo: 'CONFIG_ERROR', mensaje: 'API_BASE_URL no configurada' } },
+        { status: 500 }
+      );
+      return withCors(res);
+    }
     const backendResponse = await fetch(BACKEND_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Opcional: Reenviar tokens de autorización si los tienes
-        // 'Authorization': req.headers.get('Authorization') || '', 
       },
       body: JSON.stringify(body),
     });
@@ -63,46 +68,31 @@ export async function POST(req: NextRequest) {
 
 /*
 type CreateBody = {
-  version?: string;
   fuente_modelo?: 'ai' | '3d_upload' | 'texture_image' | 'svg';
-  nombre_personalizado?: string;
-  usuario_id?: string;
+  url_nfc?: string | null;
   modelo?: {
     modelo_id?: string | null;
-    archivo_id?: string | null;
+    archivo?: string | null;
     url?: string | null;
     svg?: string | null;
-    textura_imagen_id?: string | null;
+    textura_imagen?: string | null;
     parametros_generacion_ai?: {
-      prompt?: string;
-      semilla?: number | null;
-      variacion?: string | null;
-      motor?: string | null;
+      text_prompt?: string;
+      imagen_prompt?: image | null;
     } | null;
-    thumbnail_url?: string | null;
   };
   parametros?: {
-    material?: string;
-    color?: string;
-    acabado?: string;
-    dimension_unidad?: 'mm' | 'cm' | 'in';
+    color?: string[];
     alto?: number;
     ancho?: number;
     profundidad?: number;
-    escala?: number;
-    cantidad?: number;
-    complejidad_estimacion?: 'baja' | 'media' | 'alta';
-    tolerancia?: 'fina' | 'estandar' | 'gruesa';
-    espesor_minimo?: number;
-    // opcionales para textura
-    uv_map?: unknown;
-    textura_escala?: number;
-  };
-  metadatos?: {
-    app_version?: string;
-    locale?: string;
-    dispositivo?: string;
-    referer?: string;
+    uv_map?: {
+      hasUV: boolean;
+      vertexCount: number;
+      triangleCount: number;
+      materialsCount?: number;
+      area?: number;
+      volumen?: number;
   };
 };
 
