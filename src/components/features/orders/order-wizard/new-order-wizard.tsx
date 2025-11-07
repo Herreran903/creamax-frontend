@@ -154,7 +154,8 @@ export default function NewOrderWizard() {
       setQuoteError(null);
       setQuoteLoading(true);
       const contract = buildCreateContract();
-      const endpoint = useMock ? '/mock/api/v1/custom/create' : '/api/v1/custom/create';
+      //const endpoint = useMock ? '/mock/api/v1/custom/create' : '/api/v1/custom/create';
+      const endpoint = '/api/v1/custom/create';
       const r = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
