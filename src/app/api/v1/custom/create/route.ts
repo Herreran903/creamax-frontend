@@ -30,8 +30,6 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Opcional: Reenviar tokens de autorización si los tienes
-        // 'Authorization': req.headers.get('Authorization') || '', 
       },
       body: JSON.stringify(body),
     });

@@ -6,6 +6,10 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
+const API_BASE_URL = process.env.API_BASE_URL;
+
+const BACKEND_URL = `${API_BASE_URL}/custom/confirmation`; 
+
 function withCors(res: NextResponse) {
   Object.entries(CORS_HEADERS).forEach(([k, v]) => res.headers.set(k, v));
   return res;
@@ -16,6 +20,49 @@ export async function OPTIONS() {
   return withCors(res);
 }
 
+export async function POST(req: NextRequest) { 
+  try {
+    const body = (await req.json().catch(() => ({})));
+
+    if (!body?.cotizacion_id || typeof body.cotizacion_id !== 'number') {
+      const res = NextResponse.json(
+        { error: { codigo: 'VALIDATION_ERROR', mensaje: 'cotizacion_id requerido' } },
+        { status: 400 }
+      );
+      return withCors(res);
+    }
+
+    const backendResponse = await fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    // 3. Manejar la respuesta del backend
+    const data = await backendResponse.json();
+    const status_code = backendResponse.status;
+    
+    // 4. Retornar la respuesta (exitosa o con error) del backend al cliente
+    const res = NextResponse.json(data, { status: status_code });
+    return withCors(res);
+  } catch (error: any) {
+      const res = NextResponse.json(
+        {
+          error: {
+            codigo: 'PROXY_ERROR',
+            mensaje: 'No se pudo conectar con el servicio de pedidos.',
+            detalles: error?.message,
+          },
+        },
+        { status: 503 } // Service Unavailable
+      );
+      return withCors(res);
+  }
+}
+
+/*
 type ConfirmationBody = {
   cotizacion_id?: number;
   nombre?: string;
@@ -72,3 +119,4 @@ export async function POST(req: NextRequest) {
     return withCors(res);
   }
 }
+*/
