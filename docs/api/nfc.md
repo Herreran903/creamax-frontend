@@ -10,7 +10,7 @@ Implementaciones principales
 - Hooks de datos: [useNfcConfig()](../../src/hooks/nfc.ts:14), [useWeeklyStatsForCode()](../../src/hooks/nfc.ts:34), [useUpdateNfcUrl()](../../src/hooks/nfc.ts:61)
 - Rutas reales (Next API): Config [GET()](../../src/app/api/v1/nfc/config/[id]/route.ts:37), [PUT()](../../src/app/api/v1/nfc/config/[id]/route.ts:71); Estadísticas [GET()](../../src/app/api/v1/nfc/stats/weekly/route.ts:38)
 - Rutas mock: Config [route.ts](../../src/app/mock/api/v1/nfc/config/[id]/route.ts), Estadísticas [route.ts](../../src/app/mock/api/v1/nfc/stats/weekly/route.ts)
-- Vista UI: [Page()](../../src/app/(main)/app/models/[id]/page.tsx:67)
+- Vista UI: [Page()](<../../src/app/(main)/app/models/[id]/page.tsx:67>)
 
 ---
 
@@ -54,7 +54,7 @@ Implementaciones principales
   - Tarjeta "Editar URL de destino" con validación y flujo PUT.
 - Gráfica:
   - Se construye con [buildSevenDaySeries()](../../src/lib/api/nfc.ts:126) para garantizar 7 días consecutivos, completando ceros.
-  - Componente bar chart accesible sin librería externa y responsive en la propia vista [Page()](../../src/app/(main)/app/models/[id]/page.tsx:15).
+  - Componente bar chart accesible sin librería externa y responsive en la propia vista [Page()](<../../src/app/(main)/app/models/[id]/page.tsx:15>).
 - Accesibilidad:
   - Roles ARIA en gráfica (role="meter") y estados.
   - Mensajes de error con role="alert".
@@ -116,46 +116,46 @@ Implementaciones principales
 ### GET /api/v1/nfc/config/:id — Response 200
 
 {
-  "nfc_id": 50,
-  "item_id": 42,
-  "short-code": "xyz789",
-  "url_destino_actual": "https://landingpage.com/campana_q4_2025"
+"nfc_id": 50,
+"item_id": 42,
+"short-code": "xyz789",
+"url_destino_actual": "https://landingpage.com/campana_q4_2025"
 }
 
 ### PUT /api/v1/nfc/config/:id — Request
 
 {
-  "url_destino_actual": "https://midominio.com/nueva-campana"
+"url_destino_actual": "https://midominio.com/nueva-campana"
 }
 
 ### PUT /api/v1/nfc/config/:id — Response 200
 
 {
-  "nfc_id": 50,
-  "item_id": 42,
-  "short-code": "xyz789",
-  "url_destino_actual": "https://midominio.com/nueva-campana"
+"nfc_id": 50,
+"item_id": 42,
+"short-code": "xyz789",
+"url_destino_actual": "https://midominio.com/nueva-campana"
 }
 
 ### GET /api/v1/nfc/stats/weekly — Response 200
 
 [
-  {
-    "short_code": "xyz789",
-    "weekly_data": {
-      "2025-10-10": 0,
-      "2025-10-11": 6,
-      "2025-10-12": 7,
-      "2025-10-13": 0,
-      "2025-10-14": 9,
-      "2025-10-15": 10,
-      "2025-10-16": 0
-    }
-  },
-  {
-    "short_code": "abc123",
-    "weekly_data": { "...": 3 }
-  }
+{
+"short_code": "xyz789",
+"weekly_data": {
+"2025-10-10": 0,
+"2025-10-11": 6,
+"2025-10-12": 7,
+"2025-10-13": 0,
+"2025-10-14": 9,
+"2025-10-15": 10,
+"2025-10-16": 0
+}
+},
+{
+"short_code": "abc123",
+"weekly_data": { "...": 3 }
+}
 ]
 
 ## Códigos de estado
@@ -206,6 +206,6 @@ curl -X PUT http://localhost:3000/mock/api/v1/nfc/config/50 \
 
 - API/Tipos/Adaptadores: [nfc.ts](../../src/lib/api/nfc.ts:1)
 - Hooks: [nfc.ts](../../src/hooks/nfc.ts:1)
-- Vista: [page.tsx](../../src/app/(main)/app/models/[id]/page.tsx:1)
+- Vista: [page.tsx](<../../src/app/(main)/app/models/[id]/page.tsx:1>)
 - Rutas reales: [config [id] route.ts](../../src/app/api/v1/nfc/config/[id]/route.ts:1), [stats weekly route.ts](../../src/app/api/v1/nfc/stats/weekly/route.ts:1)
 - Rutas mock: [config [id] route.ts](../../src/app/mock/api/v1/nfc/config/[id]/route.ts), [stats weekly route.ts](../../src/app/mock/api/v1/nfc/stats/weekly/route.ts)

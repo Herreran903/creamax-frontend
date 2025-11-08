@@ -11,7 +11,11 @@ export async function POST(req: Request) {
     }
 
     const type = file.type || 'application/octet-stream';
-    if (!/^image\/(png|jpeg|jpg|webp|gif)$/i.test(type)) {
+    const ok =
+      /^image\/(png|jpeg|jpg|webp|gif)$/i.test(type) ||
+      /^model\/(stl|x\.stl)$/i.test(type) ||
+      /^application\/(sla|octet-stream)$/i.test(type);
+    if (!ok) {
       return NextResponse.json({ error: 'Unsupported content-type' }, { status: 415 });
     }
 

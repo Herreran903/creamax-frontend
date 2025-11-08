@@ -19,6 +19,8 @@ export default function AiTab(_props: AiTabProps) {
   const [imageUrl, setImageUrl] = React.useState('');
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
   const [uploading, setUploading] = React.useState(false);
+  const [imageFileToken, setImageFileToken] = React.useState('');
+  const [imageObject, setImageObject] = React.useState<any | null>(null);
 
   const { taskId, status, progress, previewUrl, glbUrl, error, createTask } = useTripoTask();
   const MAX_WAIT_MS = MAX_WAIT_MS_EXPORT;
@@ -27,9 +29,14 @@ export default function AiTab(_props: AiTabProps) {
 
   const didEmitRef = React.useRef(false);
 
+  const hasText = React.useMemo(() => prompt.trim().length > 0, [prompt]);
+  const hasImage = React.useMemo(
+    () => !!(imageFileToken || imageObject || imageUrl),
+    [imageFileToken, imageObject, imageUrl]
+  );
   const canGenerate = React.useMemo(
-    () => prompt.trim().length > 0 || !!(imageUrl || imagePreview),
-    [prompt, imageUrl, imagePreview]
+    () => (hasText || hasImage) && !uploading,
+    [hasText, hasImage, uploading]
   );
   const onGenerate = React.useCallback(async () => {
     if (!canGenerate) {
@@ -44,8 +51,16 @@ export default function AiTab(_props: AiTabProps) {
       createdAt: Date.now(),
     });
 
-    await createTask(prompt.trim(), { imageUrl });
-  }, [canGenerate, createTask, imageUrl, prompt, setLoading]);
+    try {
+      await createTask(prompt.trim(), { imageUrl, imageFileToken, imageObject });
+    } catch (e: any) {
+      setError(e?.message || 'La generación con IA falló al crear la tarea.', {
+        source: 'ai',
+        format: 'glb',
+        createdAt: Date.now(),
+      });
+    }
+  }, [canGenerate, createTask, imageUrl, imageFileToken, imageObject, prompt, setLoading, setError]);
 
   React.useEffect(() => {
     if (status === 'RUNNING' || status === 'PENDING') {
@@ -111,16 +126,36 @@ export default function AiTab(_props: AiTabProps) {
     const f = files[0];
     try {
       setUploading(true);
+      // Always show a local preview for UX
+      setImagePreview(URL.createObjectURL(f));
+
+      // Upload directly to Tripo via our proxy to obtain a file_token (preferred)
       const fd = new FormData();
       fd.append('file', f);
-      const res = await fetch('/api/uploads', { method: 'POST', body: fd });
+      const res = await fetch('/api/tripo/upload', { method: 'POST', body: fd });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Error subiendo imagen');
-      setImageUrl(data.url);
-      setImagePreview(URL.createObjectURL(f));
+
+      if (!res.ok || data?.code !== 0) {
+        throw new Error(data?.error || data?.message || 'Error subiendo imagen a Tripo');
+      }
+
+      const tok: string | undefined = data?.data?.file_token;
+      if (tok) {
+        setImageFileToken(tok);
+        setImageObject(null);
+      } else if (data?.data) {
+        // Some environments may return an object reference instead of a token
+        setImageObject(data.data);
+        setImageFileToken('');
+      }
+
+      // Do not rely on our internal URL (serverless memory is ephemeral)
+      setImageUrl('');
     } catch (e) {
       setImageUrl('');
       setImagePreview(null);
+      setImageFileToken('');
+      setImageObject(null);
     } finally {
       setUploading(false);
     }
@@ -129,6 +164,8 @@ export default function AiTab(_props: AiTabProps) {
   const clearImage = () => {
     setImageUrl('');
     setImagePreview(null);
+    setImageFileToken('');
+    setImageObject(null);
   };
 
   const dropPreview = imagePreview ?? (imageUrl ? imageUrl : null);
@@ -153,12 +190,26 @@ export default function AiTab(_props: AiTabProps) {
                 placeholder="Describe el objeto (p. ej., robot juguete low-poly, auto deportivo rojo low-poly)"
                 rows={2}
                 spellCheck
+                disabled={hasImage}
+                aria-disabled={hasImage}
                 className="resize-none rounded-xl border-2 border-border bg-background text-foreground
                focus-visible:ring-1 focus-visible:ring-[#0B4D67]"
               />
               {!canGenerate && (
                 <p id="ia-helper" aria-live="polite" className="mt-1 text-xs text-muted-foreground">
-                  Agrega una imagen, o escribe una descripción (o ambas) para continuar.
+                  Agrega una imagen o escribe una descripción para continuar.
+                </p>
+              )}
+              {hasText && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  La carga de imagen está bloqueada mientras hay texto. Borra el texto para usar
+                  imagen.
+                </p>
+              )}
+              {hasImage && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  El campo de descripción está bloqueado mientras hay una imagen. Quita la imagen
+                  para habilitarlo.
                 </p>
               )}
             </div>
@@ -176,18 +227,21 @@ export default function AiTab(_props: AiTabProps) {
                 uploading={uploading}
                 onClear={clearImage}
                 className="text-xs"
+                disabled={hasText}
               />
             </div>
             <Button
               onClick={onGenerate}
-              aria-disabled={!canGenerate}
+              aria-disabled={!canGenerate || uploading}
               aria-describedby={!canGenerate ? 'ia-helper' : undefined}
               title={
                 !canGenerate
-                  ? 'Agrega una imagen, o escribe una descripción (o ambas) para continuar.'
-                  : undefined
+                  ? 'Agrega una imagen o escribe una descripción para continuar.'
+                  : uploading
+                    ? 'Subiendo imagen… espera a que termine.'
+                    : undefined
               }
-              disabled={!canGenerate}
+              disabled={!canGenerate || uploading}
               className="
                 rounded-xl
                 px-5 py-5

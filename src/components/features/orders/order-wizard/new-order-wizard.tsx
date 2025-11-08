@@ -1,5 +1,6 @@
 'use client';
 import * as React from 'react';
+import * as THREE from 'three';
 import { Button } from '@/components/ui/button';
 import { Stepper } from '@/components/ui/stepper';
 import ModelSourceTabs, { ModelSourceTab, SelectedMode } from './model-source-tabs';
@@ -60,7 +61,7 @@ export default function NewOrderWizard() {
   const o = useOrder();
   const nfcInvalid = o.includeNfc && !isValidUrl(o.nfcUrl);
 
-  // Build unified contract (version 1.0) for /api/v1/custom/create
+  // Build contract for /api/v1/custom/create (updated schema)
   const buildCreateContract = () => {
     // Determine fuente_modelo
     let fuente_modelo: 'ai' | '3d_upload' | 'texture_image' | 'svg';
@@ -68,82 +69,147 @@ export default function NewOrderWizard() {
     else if (selectedMode === 'UPLOAD3D') fuente_modelo = '3d_upload';
     else if (selectedMode === 'SVG') fuente_modelo = 'svg';
     else {
-      // PRESETS/ARTESANAL: prefer SVG if present, else texture image, else fallback to texture_image
+      // PRESETS/ARTESANAL: prefer SVG if present, else texture image
       if ((o as any).svgText) fuente_modelo = 'svg';
       else if ((o as any).textureImageUrl) fuente_modelo = 'texture_image';
       else fuente_modelo = 'texture_image';
     }
 
-    // Model refs
-    const modelo: any = {
-      modelo_id: null,
-      archivo_id: null,
-      url: null as string | null,
-      svg: null as string | null,
-      textura_imagen_id: null as string | null,
-      parametros_generacion_ai: null as any,
-      thumbnail_url: null as string | null,
+    // Helpers to compute model stats from ActiveModel (dimensions and UV info)
+    const computeStatsFromActiveModel = () => {
+      try {
+        if (amState.status !== 'READY' || !(amState as any).data) {
+          return {
+            alto: null as number | null,
+            ancho: null as number | null,
+            profundidad: null as number | null,
+            uv_map: null as
+              | {
+                  hasUV: boolean;
+                  vertexCount: number;
+                  triangleCount: number;
+                  materialsCount?: number;
+                  area?: number | null;
+                  volumen?: number | null;
+                }
+              | null,
+          };
+        }
+        const rootAny: any = (amState as any).data;
+        const root: any = rootAny?.scene ?? rootAny;
+
+        // Dimensions via bounding box
+        const box = new THREE.Box3().setFromObject(root);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const alto = Number.isFinite(size.y) ? Number(size.y) : null;
+        const ancho = Number.isFinite(size.x) ? Number(size.x) : null;
+        const profundidad = Number.isFinite(size.z) ? Number(size.z) : null;
+
+        let hasUV = false;
+        let vertexCount = 0;
+        let triangleCount = 0;
+        const mats = new Set<string>();
+
+        root.traverse?.((child: any) => {
+          if (child?.isMesh && child.geometry) {
+            const geo = child.geometry;
+            const pos = geo.attributes?.position;
+            const idx = geo.index;
+            const uv = geo.attributes?.uv;
+            if (uv) hasUV = true;
+            const vCount = pos?.count ?? 0;
+            vertexCount += vCount;
+            const tri = idx?.count ? Math.floor(idx.count / 3) : Math.floor((vCount as number) / 3);
+            triangleCount += tri;
+            const m = child.material;
+            if (Array.isArray(m)) {
+              for (const mm of m) mats.add(mm?.uuid ?? mm?.id ?? `${mats.size}`);
+            } else if (m) {
+              mats.add(m.uuid ?? m.id ?? `${mats.size}`);
+            }
+          }
+        });
+
+        const uv_map = {
+          hasUV,
+          vertexCount,
+          triangleCount,
+          materialsCount: mats.size || undefined,
+          area: null,
+          volumen: null,
+        };
+
+        return { alto, ancho, profundidad, uv_map };
+      } catch {
+        return {
+          alto: null as number | null,
+          ancho: null as number | null,
+          profundidad: null as number | null,
+          uv_map: null as any,
+        };
+      }
     };
 
-    // Try to provide best available reference (use local wizard state where applicable)
+    const stats = computeStatsFromActiveModel();
+    const isPreset = fuente_modelo === 'svg' || fuente_modelo === 'texture_image';
+
+    // Model refs per new schema
+    const modelo: any = {
+      modelo_id: isPreset ? selectedPresetId : null,
+      archivo: null as string | null,
+      url: null as string | null,
+      svg: null as string | null,
+      textura_imagen: null as string | null,
+      parametros_generacion_ai: null as
+        | {
+            text_prompt?: string;
+            imagen_prompt?: any | null;
+          }
+        | null,
+    };
+
     if (fuente_modelo === 'ai') {
       modelo.url = aiGlbUrl ? `/api/tripo/proxy?url=${encodeURIComponent(aiGlbUrl)}` : null;
       modelo.parametros_generacion_ai = {
-        prompt: o.prompt || '',
-        semilla: null,
-        variacion: null,
-        motor: 'shape-gen-v1',
+        text_prompt: o.prompt || '',
+        imagen_prompt: null,
       };
     } else if (fuente_modelo === '3d_upload') {
-      modelo.url = uploadedUrl ?? null;
+      // For 3D upload, we'll upload the binary and set modelo.archivo during requestQuote
+      modelo.archivo = null;
+      modelo.url = null;
     } else if (fuente_modelo === 'texture_image') {
-      // we only have a local object URL; include it as url reference
-      modelo.textura_imagen_id = null;
-      modelo.url = (o as any).textureImageUrl ?? null;
+      // presets with image texture
+      modelo.textura_imagen = (o as any).textureImageUrl ?? null;
+      modelo.url = null;
     } else if (fuente_modelo === 'svg') {
+      // presets with svg
       modelo.svg = (o as any).svgText ?? null;
     }
 
-    // Nombre personalizado heurístico
-    const nombre_personalizado =
-      (o as any).uploadedName ||
+    // Nombre personalizado (máx. 30 caracteres)
+    const nombreRaw =
+      (o as any).customName?.trim() ||
       (amState.meta?.name ?? null) ||
       (selectedPresetId ? `Preset ${selectedPresetId}` : null) ||
       'Llavero Personalizado';
+    const nombre_personalizado = String(nombreRaw).slice(0, 30);
 
+    // Parametros por nueva especificación
     const parametros = {
-      material: 'PLA',
-      color: '#FF4D4F',
-      acabado: 'mate',
-      dimension_unidad: 'mm',
-      alto: 50,
-      ancho: 30,
-      profundidad: 5,
-      escala: 1.0,
-      cantidad: o.quantity || 50,
-      complejidad_estimacion: 'media',
-      tolerancia: 'estandar',
-      espesor_minimo: 1.2,
-      // Opcionales si aplica textura
-      uv_map: undefined,
-      textura_escala: undefined,
-    };
-
-    const metadatos = {
-      app_version: 'web@1.2.3',
-      locale: 'es-CL',
-      dispositivo: 'desktop',
-      referer: 'paso_2',
+      color: null as string[] | null,
+      alto: stats.alto,
+      ancho: stats.ancho,
+      profundidad: stats.profundidad,
+      uv_map: stats.uv_map,
     };
 
     const contract = {
-      version: '1.0',
       fuente_modelo,
       nombre_personalizado,
-      usuario_id: 'usr_anon',
       modelo,
       parametros,
-      metadatos,
     };
 
     return contract;
@@ -153,8 +219,36 @@ export default function NewOrderWizard() {
     try {
       setQuoteError(null);
       setQuoteLoading(true);
-      const contract = buildCreateContract();
-      //const endpoint = useMock ? '/mock/api/v1/custom/create' : '/api/v1/custom/create';
+
+      // Build base contract
+      const contract: any = buildCreateContract();
+
+      // If 3D upload, upload the local file blob and set modelo.archivo (backend-ready)
+      if (contract.fuente_modelo === '3d_upload' && uploadedUrl) {
+        try {
+          const resp = await fetch(uploadedUrl);
+          const blob = await resp.blob();
+          // Name fallback and content-type for STL
+          const fname = (uploadedName || 'modelo.stl').replace(/[^a-zA-Z0-9_.-]/g, '_');
+          const type = blob.type || 'application/sla';
+          // Ensure a File instance so filename is preserved server-side
+          const file = new File([blob], fname, { type });
+          const fd = new FormData();
+          fd.append('file', file);
+
+          const up = await fetch('/api/uploads', { method: 'POST', body: fd });
+          const upData = await up.json();
+          if (!up.ok || !upData?.url) {
+            throw new Error(upData?.error || 'No se pudo subir el archivo 3D');
+          }
+          contract.modelo.archivo = upData.url;
+          contract.modelo.url = null;
+        } catch (err: any) {
+          throw new Error(err?.message || 'No se pudo preparar el archivo 3D');
+        }
+      }
+
+      // Send contract to backend
       const endpoint = '/api/v1/custom/create';
       const r = await fetch(endpoint, {
         method: 'POST',
@@ -175,7 +269,7 @@ export default function NewOrderWizard() {
     } finally {
       setQuoteLoading(false);
     }
-  }, [useMock, selectedMode, o, amState.meta, selectedPresetId]);
+  }, [useMock, selectedMode, o, amState.meta, selectedPresetId, uploadedUrl, uploadedName]);
 
   const goNext = async () => {
     if (step === 1) {

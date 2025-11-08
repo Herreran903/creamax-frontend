@@ -6,9 +6,12 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-const API_BASE_URL = (process.env.NEXT_URL_BACKEND ?? process.env.API_BASE_URL ?? '').replace(/\/+$/, '');
+const API_BASE_URL = (process.env.NEXT_URL_BACKEND ?? process.env.API_BASE_URL ?? '').replace(
+  /\/+$/,
+  ''
+);
 
-const BACKEND_URL = `${API_BASE_URL}/custom/create`; 
+const BACKEND_URL = `${API_BASE_URL}/custom/create`;
 
 function withCors(res: NextResponse) {
   Object.entries(CORS_HEADERS).forEach(([k, v]) => res.headers.set(k, v));
@@ -24,7 +27,7 @@ export async function POST(req: NextRequest) {
   try {
     // 1. Obtener el cuerpo de la solicitud tal cual
     const body = await req.json().catch(() => ({}));
-    
+
     // 2. Reenviar la solicitud al backend FastAPI/Python
     if (!API_BASE_URL) {
       const res = NextResponse.json(
@@ -44,11 +47,10 @@ export async function POST(req: NextRequest) {
     // 3. Manejar la respuesta del backend
     const data = await backendResponse.json();
     const status_code = backendResponse.status;
-    
+
     // 4. Retornar la respuesta (exitosa o con error) del backend al cliente
     const res = NextResponse.json(data, { status: status_code });
     return withCors(res);
-
   } catch (err: any) {
     // Esto captura errores de red (ej. el backend está caído o no responde)
     const res = NextResponse.json(
@@ -64,7 +66,6 @@ export async function POST(req: NextRequest) {
     return withCors(res);
   }
 }
-
 
 /*
 type CreateBody = {

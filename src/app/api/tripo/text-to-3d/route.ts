@@ -91,7 +91,10 @@ async function uploadUrlToTripo(absUrl: string): Promise<string> {
   const fd = new FormData();
   fd.append('file', new Blob([buf], { type: contentType }), filename);
 
-  const apiKey = process.env.NEXT_TRIPO_API_KEY;
+  const apiKey =
+    process.env.NEXT_TRIPO_API_KEY ||
+    process.env.TRIPO_API_KEY ||
+    process.env.NEXT_PUBLIC_TRIPO_API_KEY;
   if (!apiKey) throw new Error('Falta NEXT_TRIPO_API_KEY');
 
   const up = await fetch('https://api.tripo3d.ai/v2/openapi/upload', {
@@ -241,33 +244,34 @@ export async function POST(req: Request) {
       if (typeof val !== 'undefined') payload[key] = val;
     };
 
-    // Apply commonly used geometry options for 3D (keep defaults reasonable/cost-friendly)
+    // Apply geometry options only if explicitly provided by the client.
+    // Avoid forcing defaults that may conflict with Tripo validations.
     if (
       taskType.endsWith('_to_model') ||
       taskType === 'texture_model' ||
       taskType === 'refine_model'
     ) {
-      maybeAssign('texture', typeof texture === 'boolean' ? texture : false);
-      maybeAssign('pbr', typeof pbr === 'boolean' ? pbr : false);
-      maybeAssign('smart_low_poly', typeof smart_low_poly === 'boolean' ? smart_low_poly : true);
-      maybeAssign('auto_size', typeof auto_size === 'boolean' ? auto_size : false);
+      if (typeof texture !== 'undefined') maybeAssign('texture', texture);
+      if (typeof pbr !== 'undefined') maybeAssign('pbr', pbr);
+      if (typeof smart_low_poly !== 'undefined') maybeAssign('smart_low_poly', smart_low_poly);
+      if (typeof auto_size !== 'undefined') maybeAssign('auto_size', auto_size);
       // geometry_quality only valid for v3.x (docs)
-      if (isV3Plus) {
-        maybeAssign('geometry_quality', geometry_quality || 'standard');
+      if (isV3Plus && typeof geometry_quality !== 'undefined') {
+        maybeAssign('geometry_quality', geometry_quality);
       }
-      maybeAssign('face_limit', face_limit);
-      maybeAssign('texture_quality', texture_quality);
-      maybeAssign('texture_seed', texture_seed);
+      if (typeof face_limit !== 'undefined') maybeAssign('face_limit', face_limit);
+      if (typeof texture_quality !== 'undefined') maybeAssign('texture_quality', texture_quality);
+      if (typeof texture_seed !== 'undefined') maybeAssign('texture_seed', texture_seed);
       // texture_alignment only valid for v2.0+ (docs)
-      if (isV2OrV3) {
+      if (isV2OrV3 && typeof texture_alignment !== 'undefined') {
         maybeAssign('texture_alignment', texture_alignment);
       }
-      maybeAssign('style', style);
-      maybeAssign('orientation', orientation);
-      maybeAssign('quad', quad);
-      maybeAssign('compress', compress);
-      maybeAssign('generate_parts', generate_parts);
-      maybeAssign('model_seed', model_seed);
+      if (typeof style !== 'undefined') maybeAssign('style', style);
+      if (typeof orientation !== 'undefined') maybeAssign('orientation', orientation);
+      if (typeof quad !== 'undefined') maybeAssign('quad', quad);
+      if (typeof compress !== 'undefined') maybeAssign('compress', compress);
+      if (typeof generate_parts !== 'undefined') maybeAssign('generate_parts', generate_parts);
+      if (typeof model_seed !== 'undefined') maybeAssign('model_seed', model_seed);
     }
 
     // Per-type shaping
@@ -281,18 +285,32 @@ export async function POST(req: Request) {
       case 'image_to_model': {
         // Prefer file_token/object when provided (bypasses public URL requirement)
         if (typeof imageFileToken === 'string' && imageFileToken.trim()) {
-          payload.file = { type: 'jpeg', file_token: String(imageFileToken).trim() };
+          // Include type as recommended by docs
+          payload.file = { type: 'jpg', file_token: String(imageFileToken).trim() };
           break;
         }
         if (imageObject && typeof imageObject === 'object') {
-          payload.file = { object: imageObject };
+          // Map STS/object and include type as recommended by docs.
+          const obj: any = imageObject;
+          const ftype =
+            (typeof obj?.type === 'string' && obj.type) ||
+            (typeof obj?.mime_type === 'string' && (obj.mime_type.includes('png') ? 'png' : 'jpg')) ||
+            'jpg';
+
+          if (obj.bucket && obj.key) {
+            payload.file = { type: ftype, bucket: String(obj.bucket), key: String(obj.key) };
+          } else if (obj.object && typeof obj.object === 'object') {
+            payload.file = { type: ftype, object: obj.object };
+          } else {
+            payload.file = { type: ftype, object: obj };
+          }
           break;
         }
 
         // Else, use URL. If it's private/local, upload it to Tripo to obtain a file_token.
         const abs = ensureAbsoluteUrl(req, String(imageUrl));
         const ext = getExtFromUrl(abs);
-        const inferredType = ext === 'png' ? 'png' : 'jpeg';
+        const inferredType = ext === 'png' ? 'png' : 'jpg';
 
         if (isPrivateOrLocalUrl(abs)) {
           try {
@@ -390,10 +408,20 @@ export async function POST(req: Request) {
       }
     }
 
+    const apiKey =
+      process.env.NEXT_TRIPO_API_KEY ||
+      process.env.TRIPO_API_KEY ||
+      process.env.NEXT_PUBLIC_TRIPO_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'Falta NEXT_TRIPO_API_KEY (o TRIPO_API_KEY)' },
+        { status: 500 }
+      );
+    }
     const res = await fetch('https://api.tripo3d.ai/v2/openapi/task', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.NEXT_TRIPO_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),

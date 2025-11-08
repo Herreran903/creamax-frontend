@@ -14,7 +14,7 @@ type FileMeta = {
 const BYTES_MB = 1024 * 1024;
 export const MAX_3D_FILE_MB = 200;
 
-const ALLOWED_EXTS = ['glb', 'gltf', 'obj', 'stl'] as const;
+const ALLOWED_EXTS = ['stl'] as const;
 type AllowedExt = (typeof ALLOWED_EXTS)[number];
 
 function getExt(name: string): string {
@@ -24,7 +24,7 @@ function getExt(name: string): string {
 function pickPrimaryModel(files: File[]): File | null {
   if (!files?.length) return null;
   // Prefer GLB/GLTF over OBJ/STL when multiple files are dropped
-  const priority: AllowedExt[] = ['glb', 'gltf', 'obj', 'stl'];
+  const priority: AllowedExt[] = ['stl'];
   for (const preferred of priority) {
     const f = files.find((x) => getExt(x.name) === preferred);
     if (f) return f;
@@ -93,13 +93,13 @@ export function useUpload3DTask() {
 
       const primary = pickPrimaryModel(files);
       if (!primary) {
-        fail('Formato no soportado. Sube un GLB/GLTF (recomendado) o alternativamente OBJ/STL.');
+        fail('Formato no soportado. Sube un archivo STL (.stl).');
         return;
       }
 
       const ext = getExt(primary.name);
       if (!ALLOWED_EXTS.includes(ext as AllowedExt)) {
-        fail('Tipo de archivo no soportado. Usa .glb, .gltf, .obj o .stl');
+        fail('Tipo de archivo no soportado. Solo se permite .stl');
         return;
       }
 

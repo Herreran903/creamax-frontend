@@ -132,6 +132,88 @@ function STLMesh({ url }: { url: string }) {
   );
 }
 
+// Infer file extension from src
+// - Supports blob: URLs when a filename is appended via #filename.ext
+// - Supports proxy URLs like /api/tripo/proxy?url=...
+function inferExtFromSrc(src?: string): string | undefined {
+  if (!src) return undefined;
+  const pick = (s: string) => s.split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
+
+  // blob: URL: intenta sacar la extensión desde el hash (#filename.ext)
+  if (src.startsWith('blob:')) {
+    try {
+      const u = new URL(src);
+      const fromHash = u.hash ? pick(u.hash.replace(/^#/, '')) : undefined;
+      if (fromHash) return fromHash;
+      // No hay hash con nombre → no podemos inferir por string
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  // URLs normales (incluye proxies tipo ?url=...)
+  try {
+    const u = new URL(src);
+    let ext = pick(u.pathname);
+    if (!ext) ext = u.hash ? pick(u.hash.replace(/^#/, '')) : undefined;
+    if ((!ext || ext.length > 5) && u.searchParams.has('url')) {
+      const inner = u.searchParams.get('url')!;
+      try {
+        const iu = new URL(inner);
+        ext = pick(iu.pathname) || (iu.hash ? pick(iu.hash.replace(/^#/, '')) : undefined);
+      } catch {
+        ext = pick(inner);
+      }
+    }
+    return ext || pick(src);
+  } catch {
+    return pick(src);
+  }
+}
+
+async function sniffExtFromContent(url: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(url);
+    const buf = await res.arrayBuffer();
+    const bytes = new Uint8Array(buf.slice(0, 64));
+    const ascii = new TextDecoder().decode(bytes);
+
+    // GLB: cabecera "glTF" (0x67 0x6C 0x54 0x46)
+    if (bytes[0] === 0x67 && bytes[1] === 0x6c && bytes[2] === 0x54 && bytes[3] === 0x46) {
+      return 'glb';
+    }
+    // STL ASCII: empieza con "solid"
+    if (ascii.startsWith('solid')) return 'stl';
+    // OBJ: líneas típicas "v ", "vt ", "vn ", "o ", "g ", o comentario Wavefront
+    if (/^(v |vt |vn |o |g )/m.test(ascii) || ascii.includes('Wavefront')) return 'obj';
+
+    // STL binario: no tiene firma oficial; si no “huele” a glb/obj y el tamaño > 84 bytes, probamos stl
+    if (buf.byteLength > 84) return 'stl';
+  } catch {
+    /* no-op */
+  }
+  return undefined;
+}
+
+function useExtForSrc(src?: string) {
+  const [ext, setExt] = useState<string | undefined>(() => inferExtFromSrc(src));
+  useEffect(() => {
+    let alive = true;
+    const first = inferExtFromSrc(src);
+    setExt(first);
+    if (!first && src && src.startsWith('blob:')) {
+      sniffExtFromContent(src).then((sniffed) => {
+        if (alive && sniffed) setExt(sniffed);
+      });
+    }
+    return () => {
+      alive = false;
+    };
+  }, [src]);
+  return ext;
+}
+
 export default function ModelViewer({
   src,
   object,
@@ -159,7 +241,7 @@ export default function ModelViewer({
 }) {
   const hasSrc = !!src;
   const hasObject = !!object;
-  const ext = src?.split('.').pop()?.toLowerCase();
+  const ext = useExtForSrc(src);
   const loadErr = false;
 
   const showOverlay = !!overlayImage && (!(hasSrc || hasObject) || preferOverlay);

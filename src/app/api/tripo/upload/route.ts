@@ -18,9 +18,18 @@ export async function POST(req: Request) {
     // Note: append(name, blob, filename) is supported by the Web FormData API
     outbound.append('file', file, filename);
 
-    const apiKey = process.env.NEXT_TRIPO_API_KEY;
+    const apiKey =
+      process.env.NEXT_TRIPO_API_KEY ||
+      process.env.TRIPO_API_KEY ||
+      process.env.NEXT_PUBLIC_TRIPO_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: 'Server missing NEXT_TRIPO_API_KEY' }, { status: 500 });
+      return NextResponse.json(
+        {
+          error:
+            'Falta NEXT_TRIPO_API_KEY (o TRIPO_API_KEY). Configura la variable de entorno del API key de Tripo en el servidor.',
+        },
+        { status: 500 }
+      );
     }
 
     // Tripo upload endpoint (per Docs/Upload)

@@ -75,7 +75,13 @@ export async function PUT(req: NextRequest, ctx: any) {
 
     if (!STORE.has(String(id))) {
       const res = NextResponse.json(
-        { error: { codigo: 'NOT_FOUND', mensaje: 'Configuración NFC no encontrada (mock)', detalles: { id } } },
+        {
+          error: {
+            codigo: 'NOT_FOUND',
+            mensaje: 'Configuración NFC no encontrada (mock)',
+            detalles: { id },
+          },
+        },
         { status: 404 }
       );
       return withCors(res);
