@@ -16,6 +16,7 @@ export interface FileDropProps {
   emptyTitle?: string; // override main empty-state title
   formatsHint?: string; // override formats hint text
   ariaLabel?: string; // accessibility label override
+  disabled?: boolean; // disable drop/select interactions, still allows onClear
 }
 
 export function FileDrop({
@@ -30,6 +31,7 @@ export function FileDrop({
   emptyTitle,
   formatsHint,
   ariaLabel = 'Agregar imagen de referencia',
+  disabled = false,
 }: FileDropProps) {
   const onDrop = useCallback(
     (accepted: File[]) => {
@@ -44,6 +46,7 @@ export function FileDrop({
     onDropRejected: onRejected,
     accept,
     multiple,
+    disabled,
   });
 
   const isSvgAccept = !!accept && Object.keys(accept).includes('image/svg+xml');
@@ -85,19 +88,22 @@ export function FileDrop({
       />
       <div className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold
-                       bg-white/90 text-zinc-900 hover:bg-white"
-            onClick={(e) => {
-              e.stopPropagation();
-              const root = (e.currentTarget.closest('[data-filedrop-root]') as HTMLElement) ?? null;
-              root?.querySelector<HTMLInputElement>('input[type="file"]')?.click();
-            }}
-          >
-            <RefreshCw className="h-4 w-4" />
-            Reemplazar
-          </Button>
+          {!disabled && (
+            <Button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold
+                         bg-white/90 text-zinc-900 hover:bg-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                const root =
+                  (e.currentTarget.closest('[data-filedrop-root]') as HTMLElement) ?? null;
+                root?.querySelector<HTMLInputElement>('input[type="file"]')?.click();
+              }}
+            >
+              <RefreshCw className="h-4 w-4" />
+              Reemplazar
+            </Button>
+          )}
 
           {onClear && (
             <Button
@@ -133,11 +139,13 @@ export function FileDrop({
       role="button"
       tabIndex={0}
       aria-label={ariaLabel}
+      aria-disabled={disabled || undefined}
       className={cn(
-        'relative min-h-[180px] grid place-items-center rounded-2xl cursor-pointer select-none',
+        'relative min-h-[180px] grid place-items-center rounded-2xl select-none',
         'transition-all outline-dotted outline-4 outline-[#E5E5E5]',
         'bg-muted/60 text-foreground dark:bg-white/5',
-        isDragActive && 'bg-[#0B4D67]/8',
+        disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+        isDragActive && !disabled && 'bg-[#0B4D67]/8',
         previewUrl ? 'p-0 border-0' : 'p-4',
         className
       )}

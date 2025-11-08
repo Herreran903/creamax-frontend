@@ -1,11 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getNfcConfig,
-  getWeeklyStats,
   updateNfcConfig,
+  updateNfcByShortCode,
   type NfcConfig,
-  type WeeklyStatsEntry,
-  buildSevenDaySeries,
+  buildSeriesFromData,
 } from '@/lib/api/nfc';
 
 /**
@@ -29,20 +28,30 @@ export function useNfcConfig(id: string | undefined) {
 }
 
 /**
- * Query: Weekly stats filtered by short_code; returns 7-day padded series and totals
+ * Query: Clicks series derived from unified config.data (DMY format)
+ * Returns series with date normalized to YYYY-MM-DD so existing chart keeps working.
  */
-export function useWeeklyStatsForCode(short_code: string | undefined) {
+export function useNfcClicksSeries(id: string | undefined) {
   return useQuery({
-    queryKey: ['nfc-weekly-stats', short_code],
+    queryKey: ['nfc-clicks', id],
     queryFn: async () => {
-      const all = await getWeeklyStats();
-      const match = all.find((e: WeeklyStatsEntry) => e.short_code === short_code);
-      return match ?? null;
+      if (!id) throw new Error('ID NFC no definido');
+      return getNfcConfig(id);
     },
-    enabled: !!short_code,
-    select: (entry) => {
-      if (!entry) return { series: [], total: 0, minDate: '', maxDate: '' };
-      return buildSevenDaySeries(entry.weekly_data);
+    enabled: !!id,
+    select: (cfg: NfcConfig) => {
+      const data = (cfg as any)?.data ?? [];
+      const result = buildSeriesFromData(data);
+      const toISO = (s: string) => {
+        const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
+        if (!m) return s;
+        const [, dd, mm, yyyy] = m;
+        return `${yyyy}-${mm}-${dd}`;
+      };
+      return {
+        ...result,
+        series: result.series.map((d) => ({ date: toISO(d.date), count: d.count })),
+      };
     },
     staleTime: 30_000,
     gcTime: 5 * 60_000,
@@ -69,6 +78,29 @@ export function useUpdateNfcUrl(id: string | undefined) {
       // update cache and revalidate in background
       qc.setQueryData(['nfc-config', id], updated);
       qc.invalidateQueries({ queryKey: ['nfc-config', id] });
+    },
+  });
+}
+
+/**
+ * Mutation: Update NFC target URL by short_code (PUT)
+ */
+export function useUpdateNfcUrlByShortCode(
+  short_code: string | undefined,
+  idForInvalidate?: string | undefined
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ url_destino_actual }: { url_destino_actual: string }) => {
+      if (!short_code) throw new Error('SHORT CODE no definido');
+      return updateNfcByShortCode(short_code, { url_destino_actual });
+    },
+    onSuccess: (updated: NfcConfig) => {
+      if (idForInvalidate) {
+        qc.setQueryData(['nfc-config', idForInvalidate], updated);
+        qc.invalidateQueries({ queryKey: ['nfc-config', idForInvalidate] });
+        qc.invalidateQueries({ queryKey: ['nfc-clicks', idForInvalidate] });
+      }
     },
   });
 }

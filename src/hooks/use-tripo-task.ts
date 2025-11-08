@@ -166,16 +166,29 @@ export function useTripoTask() {
   const createTask = useCallback(
     async (
       prompt: string,
-      opts?: { imageUrl?: string; imageFileToken?: string }
+      opts?: { imageUrl?: string; imageFileToken?: string; imageObject?: any }
     ): Promise<void> => {
       reset();
       setStatus('PENDING');
-      const body: any = { prompt: prompt.trim() };
 
-      if (opts?.imageFileToken && opts.imageFileToken.trim()) {
-        body.imageFileToken = opts.imageFileToken.trim();
-      } else if (opts?.imageUrl && opts.imageUrl.trim()) {
-        body.imageUrl = opts.imageUrl.trim();
+      const trimmed = (prompt || '').trim();
+      const token = (opts?.imageFileToken || '').trim();
+      const imgUrl = (opts?.imageUrl || '').trim();
+      const obj = opts?.imageObject;
+      const hasImage = !!(token || obj || imgUrl);
+
+      const body: any = {};
+
+      if (hasImage) {
+        // Image flow: explicit type and no prompt field
+        body.type = 'image_to_model';
+        if (token) body.imageFileToken = token;
+        else if (obj) body.imageObject = obj;
+        else body.imageUrl = imgUrl;
+      } else {
+        // Text flow: explicit type and no file fields
+        body.type = 'text_to_model';
+        body.prompt = trimmed;
       }
 
       const res = await fetch('/api/tripo/text-to-3d', {

@@ -72,6 +72,9 @@ type Ctx = {
   notes: string;
   setNotes: (s: string) => void;
 
+  customName: string;
+  setCustomName: (s: string) => void;
+
   /**
    * If a texture image was selected in presets, store its URL for contract building.
    */
@@ -136,6 +139,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [nfcUrl, setNfcUrl] = React.useState('');
   const [quantity, setQuantity] = React.useState<number>(50);
   const [notes, setNotes] = React.useState('');
+  const [customName, setCustomName] = React.useState<string>('');
   const [textureImageUrl, setTextureImageUrl] = React.useState<string | null>(null);
   const [quoteData, setQuoteData] = React.useState<QuoteData | null>(null);
   const [quoteResponse, setQuoteResponse] = React.useState<any | null>(null);
@@ -224,6 +228,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     setQuantity,
     notes,
     setNotes,
+    customName,
+    setCustomName,
     quoteData,
     setQuoteData,
     textureImageUrl,

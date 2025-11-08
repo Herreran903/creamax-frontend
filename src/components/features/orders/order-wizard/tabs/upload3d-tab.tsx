@@ -46,7 +46,7 @@ export default function Upload3DTab({
       if (!fileMeta) return;
       setLoading({
         source: 'upload',
-        format: (fileMeta.ext as any) || 'glb',
+        format: (fileMeta.ext as any) || 'stl',
         name: fileMeta.name,
         sizeMB: Math.round((fileMeta.size / (1024 * 1024)) * 10) / 10,
         createdAt: Date.now(),
@@ -155,11 +155,10 @@ export default function Upload3DTab({
   }, [url, fileMeta, markReady, setReady, setError, status]);
 
   const accept3D = {
-    'model/gltf-binary': ['.glb'],
-    'model/gltf+json': ['.gltf'],
-    'model/obj': ['.obj'],
     'model/stl': ['.stl'],
-    'application/octet-stream': ['.glb', '.gltf', '.obj', '.stl'],
+    'model/x.stl': ['.stl'],
+    'application/sla': ['.stl'],
+    'application/octet-stream': ['.stl'],
   } as const;
 
   const getExt = (nameOrUrl: string): string => {
@@ -285,6 +284,9 @@ export default function Upload3DTab({
       ? 'loading'
       : 'idle';
 
+  // Ensure ModelViewer can infer extension for blob: URLs (append filename via hash)
+  const viewUrl = url && fileMeta?.name ? `${url}#${fileMeta.name}` : url;
+
   const messages = [
     'Validando archivo…',
     'Cargando geometría…',
@@ -313,20 +315,18 @@ export default function Upload3DTab({
                 accept={accept3D as any}
                 ariaLabel="Agregar modelo 3D"
                 emptyTitle="Arrastra y suelta tu modelo 3D"
-                formatsHint={`GLB, GLTF, OBJ, STL • máx. ${MAX_3D_FILE_MB} MB`}
+                formatsHint={`STL • máx. ${MAX_3D_FILE_MB} MB`}
               />
               {fileMeta?.name ? (
                 <div className="text-[11px] text-muted-foreground leading-relaxed">
-                  {fileMeta.ext !== 'glb' && fileMeta.ext !== 'gltf' ? (
+                  {fileMeta.ext !== 'stl' ? (
                     <div className="mt-1 text-[10px]">
-                      Sugerencia: para mejor compatibilidad, convierte a GLB antes de subir.
+                      Solo aceptamos STL. Convierte tu modelo a STL e inténtalo de nuevo.
                     </div>
                   ) : null}
                 </div>
               ) : (
-                <p className="text-[11px] text-muted-foreground">
-                  Sube un GLB/GLTF (recomendado). También aceptamos OBJ/STL.
-                </p>
+                <p className="text-[11px] text-muted-foreground">Solo aceptamos STL (.stl).</p>
               )}
             </div>
             <div className="space-y-2">
@@ -360,7 +360,7 @@ export default function Upload3DTab({
         <div className="md:col-span-2">
           <PreviewStage
             state={previewState}
-            glbUrl={url}
+            glbUrl={viewUrl}
             imageUrl={null}
             progress={typeof progress === 'number' ? progress : null}
             messages={messages}

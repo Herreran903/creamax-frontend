@@ -6,9 +6,12 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-const API_BASE_URL = (process.env.NEXT_URL_BACKEND ?? process.env.API_BASE_URL ?? '').replace(/\/+$/, '');
+const API_BASE_URL = (process.env.NEXT_URL_BACKEND ?? process.env.API_BASE_URL ?? '').replace(
+  /\/+$/,
+  ''
+);
 
-const BACKEND_URL = `${API_BASE_URL}/custom/confirmation`; 
+const BACKEND_URL = `${API_BASE_URL}/custom/confirmation`;
 
 function withCors(res: NextResponse) {
   Object.entries(CORS_HEADERS).forEach(([k, v]) => res.headers.set(k, v));
@@ -20,9 +23,9 @@ export async function OPTIONS() {
   return withCors(res);
 }
 
-export async function POST(req: NextRequest) { 
+export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json().catch(() => ({})));
+    const body = await req.json().catch(() => ({}));
 
     if (!body?.cotizacion_id || typeof body.cotizacion_id !== 'number') {
       const res = NextResponse.json(
@@ -31,7 +34,7 @@ export async function POST(req: NextRequest) {
       );
       return withCors(res);
     }
- 
+
     if (!API_BASE_URL) {
       const res = NextResponse.json(
         { error: { codigo: 'CONFIG_ERROR', mensaje: 'API_BASE_URL no configurada' } },
@@ -39,7 +42,7 @@ export async function POST(req: NextRequest) {
       );
       return withCors(res);
     }
- 
+
     const backendResponse = await fetch(BACKEND_URL, {
       method: 'POST',
       headers: {
@@ -51,22 +54,22 @@ export async function POST(req: NextRequest) {
     // 3. Manejar la respuesta del backend
     const data = await backendResponse.json();
     const status_code = backendResponse.status;
-    
+
     // 4. Retornar la respuesta (exitosa o con error) del backend al cliente
     const res = NextResponse.json(data, { status: status_code });
     return withCors(res);
   } catch (error: any) {
-      const res = NextResponse.json(
-        {
-          error: {
-            codigo: 'PROXY_ERROR',
-            mensaje: 'No se pudo conectar con el servicio de pedidos.',
-            detalles: error?.message,
-          },
+    const res = NextResponse.json(
+      {
+        error: {
+          codigo: 'PROXY_ERROR',
+          mensaje: 'No se pudo conectar con el servicio de pedidos.',
+          detalles: error?.message,
         },
-        { status: 503 } // Service Unavailable
-      );
-      return withCors(res);
+      },
+      { status: 503 } // Service Unavailable
+    );
+    return withCors(res);
   }
 }
 

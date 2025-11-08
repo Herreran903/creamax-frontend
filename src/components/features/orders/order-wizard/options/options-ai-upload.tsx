@@ -67,6 +67,25 @@ export default function OptionsAIUpload({ notes, setNotes }: OptionsAIUploadProp
             </div>
             <div className="space-y-2">
               <Label
+                htmlFor="custom-name"
+                className="text-xs font-bold tracking-wide text-foreground/80 flex"
+              >
+                <FileText className="h-4 w-4 mr-1" size={12} />
+                NOMBRE DEL MODELO
+              </Label>
+              <Input
+                id="custom-name"
+                value={o.customName}
+                onChange={(e) => o.setCustomName(e.target.value.slice(0, 30))}
+                placeholder="Ej: Llavero para campaña"
+                maxLength={30}
+                className="h-9 w-full rounded-xl border-2 border-border bg-background text-foreground px-3
+                  focus-visible:ring-1 focus-visible:ring-[#0B4D67] disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              <p className="text-[11px] text-muted-foreground">{o.customName.length}/30</p>
+            </div>
+            <div className="space-y-2">
+              <Label
                 htmlFor="extra-notes"
                 className="text-xs font-bold tracking-wide text-foreground/80 flex"
               >
