@@ -3,7 +3,7 @@ import * as React from 'react';
 import * as THREE from 'three';
 import { Button } from '@/components/ui/button';
 import { Stepper } from '@/components/ui/stepper';
-import ModelSourceTabs, { ModelSourceTab, SelectedMode } from './model-source-tabs';
+import ModelSourceTabs, { ModelSourceTab, SelectedMode, PRESETS } from './model-source-tabs';
 import type { CustomConfirmationResponse } from '@/lib/api/custom-confirmation';
 import { useTripoTask } from '@/hooks/use-tripo-task';
 import { ArrowLeft, ArrowRight, CheckCircle2, Home } from 'lucide-react';
@@ -154,6 +154,9 @@ export default function NewOrderWizard() {
     const stats = computeStatsFromActiveModel();
     const isPreset = fuente_modelo === 'svg' || fuente_modelo === 'texture_image';
 
+    const selectedPreset = PRESETS.find(p => p.id === selectedPresetId);
+    const basePrice = isPreset && selectedPreset ? selectedPreset.price : 10000;
+
     // Model refs per new schema
     const modelo: any = {
       modelo_id: isPreset ? selectedPresetId : null,
@@ -167,7 +170,7 @@ export default function NewOrderWizard() {
             imagen_prompt?: any | null;
           }
         | null,
-      precio_base: 20000,
+      precio_base: basePrice,
     };
 
     if (fuente_modelo === 'ai') {
