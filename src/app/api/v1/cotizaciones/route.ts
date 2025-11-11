@@ -38,13 +38,6 @@ export async function OPTIONS() {
 
 export async function GET(req: NextRequest) {
   try {
-    const useMock = resolveUseMock(req);
-
-    if (useMock) {
-      const res = NextResponse.json(sampleData(), { status: 200 });
-      return withCors(res);
-    }
-
     if (!API_BASE_URL) {
       const res = NextResponse.json(
         { error: { codigo: 'CONFIG_ERROR', mensaje: 'API_BASE_URL no configurada' } },
@@ -57,7 +50,6 @@ export async function GET(req: NextRequest) {
     const backendRes = await fetch(url, {
       method: 'GET',
       headers: { Accept: 'application/json' },
-      // credentials and other headers can be added here if needed
     });
 
     const raw = await backendRes.json().catch(() => null);
