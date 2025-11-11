@@ -13,10 +13,11 @@ export async function OPTIONS() {
   return withCors(res);
 }
 
+    const useMock = false
+
 export async function GET(req: NextRequest, ctx: any) {
   try {
     const { id } = await ctx?.params;
-    const useMock = resolveUseMock(req);
 
     if (!useMock) {
       if (!API_BASE_URL) {
@@ -74,7 +75,6 @@ export async function GET(req: NextRequest, ctx: any) {
 export async function PUT(req: NextRequest, ctx: any) {
   try {
     const { id } = await ctx?.params;
-    const useMock = resolveUseMock(req);
     const body = (await req.json().catch(() => ({}))) as { url_destino_actual?: string };
     const nextUrl = body?.url_destino_actual;
 
