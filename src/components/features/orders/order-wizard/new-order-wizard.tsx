@@ -203,6 +203,9 @@ export default function NewOrderWizard() {
       ancho: stats.ancho,
       profundidad: stats.profundidad,
       uv_map: stats.uv_map,
+      // NFC: incluir flag y URL del pedido
+      include_nfc: Boolean(o.includeNfc),
+      nfc_url: String(o.nfcUrl ?? ''),
     };
 
     const contract = {
