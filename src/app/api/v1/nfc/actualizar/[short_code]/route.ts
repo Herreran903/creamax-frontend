@@ -9,7 +9,7 @@ export async function OPTIONS() {
 export async function PUT(req: NextRequest, ctx: any) {
   try {
     const { short_code } = await ctx?.params;
-    const useMock = resolveUseMock(req);
+    const useMock = false
     const body = (await req.json().catch(() => ({}))) as { url_destino_actual?: string };
     const nextUrl = body?.url_destino_actual;
 
@@ -47,8 +47,10 @@ export async function PUT(req: NextRequest, ctx: any) {
         return withCors(res);
       }
 
+      console.log(`${API_BASE_URL}/nfc/config/${encodeURIComponent(String(short_code))}`)
+
       const backendRes = await fetch(
-        `${API_BASE_URL}/nfc/actualizar/${encodeURIComponent(String(short_code))}`,
+        `${API_BASE_URL}/nfc/config/${encodeURIComponent(String(short_code))}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },

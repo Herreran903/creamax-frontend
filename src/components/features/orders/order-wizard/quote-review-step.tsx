@@ -121,10 +121,10 @@ export default function QuoteReviewStep({
   }, []);
 
   const handleConfirm = async () => {
-    if (!quote?.id) {
+    {/*if (!quote?.id) {
       setConfirmError('No hay cotización válida para confirmar.');
       return;
-    }
+    }*/}
     try {
       setConfirmError(null);
       setConfirming(true);
@@ -146,7 +146,7 @@ export default function QuoteReviewStep({
         notes,
       });
     } catch (e: any) {
-      setConfirmError(e?.message || 'Error al crear el pedido');
+      //setConfirmError(e?.message || 'Error al crear el pedido');
     } finally {
       setConfirming(false);
     }
