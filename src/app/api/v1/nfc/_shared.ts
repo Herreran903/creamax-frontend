@@ -55,8 +55,16 @@ function fromISOtoDMY(iso: string) {
   return `${dd}/${mm}/${y}`;
 }
 function buildHostShortUrl(req: NextRequest, short_code: string) {
-  const host = req.headers.get('host') ?? 'localhost';
-  return `${host}/${short_code}`;
+  // Prefer backend base URL when configured so short URLs point to the backend service
+  if (API_BASE_URL) return `${API_BASE_URL.replace(/\/+$/, '')}/${short_code}`;
+  try {
+    const u = new URL(req.url);
+    const host = req.headers.get('host') ?? u.host ?? 'localhost';
+    return `${u.protocol}//${host}/${short_code}`;
+  } catch {
+    const host = req.headers.get('host') ?? 'localhost';
+    return `https://${host}/${short_code}`;
+  }
 }
 export function generateMockData(days = 7) {
   const end = new Date();

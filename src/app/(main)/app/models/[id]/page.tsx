@@ -123,6 +123,7 @@ export default function Page() {
   const r = useRouter();
   const params = useParams<{ id: string }>();
   const id = params.id as string;
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
   const {
     data: cfg,
@@ -268,7 +269,7 @@ export default function Page() {
                     </Label>
                     {cfg?.url_short_code ? (
                       <a
-                        href={cfg.url_short_code}
+                        href={`${API_BASE_URL}/nfc/${cfg.short_code}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 text-[#0B4D67] font-semibold hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0B4D67] rounded-md px-2 py-1"
