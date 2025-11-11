@@ -96,6 +96,11 @@ type Ctx = {
   svgText: string | null;
   setSvgText: (s: string | null) => void;
 
+  baseColor: string;
+  setBaseColor: (s: string) => void;
+  borderColor: string;
+  setBorderColor: (s: string) => void;
+
   // flags
   isPresets: boolean;
   isAI: boolean;
@@ -144,6 +149,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [quoteData, setQuoteData] = React.useState<QuoteData | null>(null);
   const [quoteResponse, setQuoteResponse] = React.useState<any | null>(null);
   const [svgText, setSvgText] = React.useState<string | null>(null);
+  const [baseColor, setBaseColor] = React.useState<string>('#7dd3fc');
+  const [borderColor, setBorderColor] = React.useState<string>('#7dd3fc');
 
   const isPresets = selectedMode === 'PRESETS';
   const isAI = selectedMode === 'AI';
@@ -238,6 +245,10 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     setQuoteResponse,
     svgText,
     setSvgText,
+    baseColor,
+    setBaseColor,
+    borderColor,
+    setBorderColor,
     isPresets,
     isAI,
     isUpload3D,

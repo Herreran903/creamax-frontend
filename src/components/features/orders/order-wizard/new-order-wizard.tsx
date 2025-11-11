@@ -167,6 +167,7 @@ export default function NewOrderWizard() {
             imagen_prompt?: any | null;
           }
         | null,
+      precio_base: 20000,
     };
 
     if (fuente_modelo === 'ai') {
@@ -198,7 +199,10 @@ export default function NewOrderWizard() {
 
     // Parametros por nueva especificación
     const parametros = {
-      color: null as string[] | null,
+      color: [
+        String((o as any).baseColor ?? ''),
+        String((o as any).borderColor ?? ''),
+      ].filter(c => c !== ''),
       alto: stats.alto,
       ancho: stats.ancho,
       profundidad: stats.profundidad,
