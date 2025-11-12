@@ -13,6 +13,9 @@ import { useOrder } from '@/hooks/use-order';
 import QuoteReviewStep from './quote-review-step';
 import Options from './options/options';
 import { CheckoutSuccessStep } from './checkout-success-step';
+import { normalizeSceneForExport, exportGroupTo3mf } from '@/lib/threeExportHelpers';
+import { loadFileToGroup } from '@/lib/loaderHelpers';
+import { uploadToTransferSh } from '@/lib/uploadTransferSh';
 
 function isValidUrl(s: string) {
   try {
@@ -228,39 +231,209 @@ export default function NewOrderWizard() {
       // Build base contract
       const contract: any = buildCreateContract();
 
-      // If 3D upload, upload the local file blob and set modelo.archivo (backend-ready)
-      if (contract.fuente_modelo === '3d_upload' && uploadedUrl) {
-        try {
+      // eslint-disable-next-line no-console
+      console.log('[requestQuote] Starting quote request, fuente_modelo:', contract.fuente_modelo);
+      // eslint-disable-next-line no-console
+      console.log('[requestQuote] amState.data available:', !!(amState as any).data);
+      // eslint-disable-next-line no-console
+      console.log('[requestQuote] amState.data:', (amState as any).data);
+
+      // Export 3MF and upload to transfer.sh for ALL flows
+      try {
+        let group: THREE.Group | null = null;
+
+        if (contract.fuente_modelo === '3d_upload' && uploadedUrl) {
+          // Load STL file from uploadedUrl (blob URL)
+          // eslint-disable-next-line no-console
+          console.log('[requestQuote] Loading 3D file from uploadedUrl:', uploadedUrl);
           const resp = await fetch(uploadedUrl);
           const blob = await resp.blob();
-          // Name fallback and content-type for STL
-          const fname = (uploadedName || 'modelo.stl').replace(/[^a-zA-Z0-9_.-]/g, '_');
-          const type = blob.type || 'application/sla';
-          // Ensure a File instance so filename is preserved server-side
-          const file = new File([blob], fname, { type });
-          const fd = new FormData();
-          fd.append('file', file);
-
-          const up = await fetch('/api/uploads', { method: 'POST', body: fd });
-          const upData = await up.json();
-          if (!up.ok || !upData?.url) {
-            throw new Error(upData?.error || 'No se pudo subir el archivo 3D');
+          const file = new File([blob], uploadedName || 'model.stl', { type: blob.type });
+          group = await loadFileToGroup(file);
+          // eslint-disable-next-line no-console
+          console.log('[requestQuote] Loaded 3D upload file to Group:', group);
+        } else if (contract.fuente_modelo === 'ai') {
+          // Use the active model (preview group) from amState for AI
+          if ((amState as any).data) {
+            group = (amState as any).data as THREE.Group;
+            // eslint-disable-next-line no-console
+            console.log('[requestQuote] Using active model group (AI):', group);
+          } else {
+            // eslint-disable-next-line no-console
+            console.warn('[requestQuote] No amState.data for AI');
           }
-          contract.modelo.archivo = upData.url;
-          contract.modelo.url = null;
-        } catch (err: any) {
-          throw new Error(err?.message || 'No se pudo preparar el archivo 3D');
+        } else if (contract.fuente_modelo === 'texture_image') {
+          // For texture_image (presets), try amState first, fallback to creating a simple model
+          if ((amState as any).data) {
+            group = (amState as any).data as THREE.Group;
+            // eslint-disable-next-line no-console
+            console.log('[requestQuote] Using active model group (texture_image):', group);
+          } else {
+            // Fallback: Create a simple box model as placeholder
+            // eslint-disable-next-line no-console
+            console.log('[requestQuote] Creating fallback box model for preset (no amState.data available)');
+            try {
+              const geometry = new THREE.BoxGeometry(1, 1, 0.1);
+              const material = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+              const mesh = new THREE.Mesh(geometry, material);
+              group = new THREE.Group();
+              group.add(mesh);
+              // eslint-disable-next-line no-console
+              console.log('[requestQuote] Created fallback box model');
+            } catch (e) {
+              // eslint-disable-next-line no-console
+              console.warn('[requestQuote] Could not create fallback model, will still export an empty group');
+            }
+            // Ensure group is not null so export path executes; export of an empty group yields a tiny 3MF
+            if (!group) {
+              group = new THREE.Group();
+              // eslint-disable-next-line no-console
+              console.warn('[requestQuote] Created empty THREE.Group fallback for texture_image');
+            }
+          }
+        } else if (contract.fuente_modelo === 'svg') {
+          // For SVG, try to get the 3D model from amState (SVG extruder generates one)
+          if ((amState as any).data) {
+            group = (amState as any).data as THREE.Group;
+            // eslint-disable-next-line no-console
+            console.log('[requestQuote] Using active model group (SVG extruded):', group);
+          } else {
+            // eslint-disable-next-line no-console
+            console.warn('[requestQuote] No amState.data for SVG, creating fallback');
+            // Fallback: Create a simple placeholder
+            try {
+              const geometry = new THREE.BoxGeometry(1, 1, 0.1);
+              const material = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+              const mesh = new THREE.Mesh(geometry, material);
+              group = new THREE.Group();
+              group.add(mesh);
+              // eslint-disable-next-line no-console
+              console.log('[requestQuote] Created fallback box model for SVG');
+            } catch (e) {
+              // eslint-disable-next-line no-console
+              console.warn('[requestQuote] Could not create fallback model for SVG, will still export an empty group');
+            }
+            // Ensure group is not null so export path executes; export of an empty group yields a tiny 3MF
+            if (!group) {
+              group = new THREE.Group();
+              // eslint-disable-next-line no-console
+              console.warn('[requestQuote] Created empty THREE.Group fallback for SVG');
+            }
+          }
         }
+
+        if (group) {
+          // eslint-disable-next-line no-console
+          console.log('[requestQuote] group is NOT null, proceeding with export');
+          try {
+            // Normalize the group for export
+            const normalized = normalizeSceneForExport(group, { scaleToMm: true });
+            // eslint-disable-next-line no-console
+            console.log('[requestQuote] Normalized group for export');
+
+            // Export to 3MF blob
+            const blob3mf = await exportGroupTo3mf(normalized);
+            // eslint-disable-next-line no-console
+            console.log('[requestQuote] Exported to 3MF, blob size:', blob3mf.size, 'bytes');
+
+            // Check size limit
+            const maxMb = Number(process.env.NEXT_PUBLIC_MAX_3MF_MB ?? 100);
+            const maxBytes = maxMb * 1024 * 1024;
+            if (blob3mf.size > maxBytes) {
+              throw new Error(
+                `Archivo 3MF (${Math.round(blob3mf.size / (1024 * 1024))} MB) excede el límite de ${maxMb} MB`
+              );
+            }
+
+            // Upload to transfer.sh
+            // Choose extension based on blob MIME type (fallback to STL if exporter missing)
+            const blob = blob3mf;
+            let ext = '3mf';
+            try {
+              const t = blob.type || '';
+              if (t.includes('stl')) ext = 'stl';
+              else if (t.includes('3mf')) ext = '3mf';
+            } catch (e) {
+              // keep default
+            }
+
+            const filename =
+              contract.fuente_modelo === '3d_upload' && uploadedName
+                ? uploadedName.replace(/\.[^/.]+$/, '') + `.${ext}`
+                : `model_${Date.now()}.${ext}`;
+
+            // eslint-disable-next-line no-console
+            console.log('[requestQuote] Uploading to transfer.sh as:', filename, 'blob.type=', blob.type);
+            const transferUrl = await uploadToTransferSh(blob, filename);
+
+            // eslint-disable-next-line no-console
+            console.log('[requestQuote] ✅ 3MF uploaded to transfer.sh:', transferUrl);
+
+            // Set the URL in the contract based on fuente_modelo
+            if (contract.fuente_modelo === '3d_upload') {
+              contract.modelo.url = transferUrl;
+              // eslint-disable-next-line no-console
+              console.log('[requestQuote] Set modelo.url (3d_upload) to:', transferUrl);
+            } else if (contract.fuente_modelo === 'ai') {
+              contract.modelo.model_url = transferUrl;
+              // eslint-disable-next-line no-console
+              console.log('[requestQuote] Set modelo.model_url (ai) to:', transferUrl);
+            } else if (contract.fuente_modelo === 'texture_image') {
+              contract.modelo.model_url = transferUrl;
+              // eslint-disable-next-line no-console
+              console.log('[requestQuote] Set modelo.model_url (texture_image) to:', transferUrl);
+            } else if (contract.fuente_modelo === 'svg') {
+              contract.modelo.model_url = transferUrl;
+              // eslint-disable-next-line no-console
+              console.log('[requestQuote] Set modelo.model_url (svg) to:', transferUrl);
+            }
+          } catch (exportErr: any) {
+            // eslint-disable-next-line no-console
+            console.error('[requestQuote] Error during 3MF export/upload:', exportErr);
+            // For presets and SVG, don't hard-fail if export fails - gracefully proceed
+            if (contract.fuente_modelo === 'ai' || contract.fuente_modelo === '3d_upload') {
+              throw new Error(exportErr?.message || 'Error al exportar/subir modelo 3MF');
+            }
+            // eslint-disable-next-line no-console
+            console.warn('[requestQuote] Proceeding without 3MF export due to error');
+          }
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn('[requestQuote] ⚠️ group is NULL! No export will happen');
+          // For AI and 3D uploads, this is critical; for others, we can proceed
+          if (contract.fuente_modelo === 'ai' || contract.fuente_modelo === '3d_upload') {
+            throw new Error('No se pudo obtener el modelo 3D para exportar');
+          }
+        }
+      } catch (exportErr: any) {
+        // eslint-disable-next-line no-console
+        console.error('[requestQuote] Error during model preparation:', exportErr);
+        // Only throw for critical flows
+        if (exportErr?.message && (exportErr.message.includes('No se pudo obtener') || exportErr.message.includes('excede el límite'))) {
+          throw exportErr;
+        }
+        // eslint-disable-next-line no-console
+        console.warn('[requestQuote] Continuing despite export error:', exportErr?.message);
       }
+
+      // eslint-disable-next-line no-console
+      console.log('[requestQuote] Final contract before POST:', JSON.stringify(contract, null, 2));
 
       // Send contract to backend
       const endpoint = '/api/v1/custom/create';
+      // eslint-disable-next-line no-console
+      console.log('[requestQuote] Sending POST to', endpoint);
+
       const r = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(contract),
       });
       const data = await r.json();
+
+      // eslint-disable-next-line no-console
+      console.log('[requestQuote] Response status:', r.status, 'data:', data);
+
       if (!r.ok) {
         const msg =
           data?.error?.mensaje ||
@@ -270,11 +443,13 @@ export default function NewOrderWizard() {
       }
       o.setQuoteResponse(data);
     } catch (e: any) {
+      // eslint-disable-next-line no-console
+      console.error('[requestQuote] Error:', e);
       setQuoteError(e?.message || 'Error solicitando cotización.');
     } finally {
       setQuoteLoading(false);
     }
-  }, [useMock, selectedMode, o, amState.meta, selectedPresetId, uploadedUrl, uploadedName]);
+  }, [useMock, selectedMode, o, amState.meta, amState.data, selectedPresetId, uploadedUrl, uploadedName]);
 
   const goNext = async () => {
     if (step === 1) {
