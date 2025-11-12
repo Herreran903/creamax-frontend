@@ -342,6 +342,7 @@ export interface SvgPresetComposerProps {
   className?: string;
   kind?: 'circle' | 'rect' | 'square';
   baseColor?: string;
+  backColor?: string;
   borderColor?: string;
   result: SvgProcessResult | null;
   depthMap: DepthMap;
@@ -354,6 +355,7 @@ export default function SvgPresetComposer({
   className,
   kind = 'square',
   baseColor = '#7dd3fc',
+  backColor = baseColor,
   borderColor = '#7dd3fc',
   result,
   depthMap,
@@ -505,6 +507,7 @@ export default function SvgPresetComposer({
             <group ref={groupRef} scale={1.8}>
               <MeshComponent
                 baseColor={baseColor}
+                backColor={backColor}
                 borderColor={borderColor}
                 thickness={thickness}
                 border={border}

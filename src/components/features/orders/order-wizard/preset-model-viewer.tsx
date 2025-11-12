@@ -15,6 +15,7 @@ export interface PresetModelViewerProps {
   className?: string;
   kind?: 'circle' | 'rect' | 'square';
   baseColor?: string;
+  backColor?: string;
   borderColor?: string;
   textureUrl?: string | null;
 }
@@ -23,6 +24,7 @@ export default function PresetModelViewer({
   className,
   kind = 'square',
   baseColor = '#7dd3fc',
+  backColor = baseColor,
   borderColor = '#7dd3fc',
   textureUrl = null,
 }: PresetModelViewerProps) {
@@ -102,6 +104,7 @@ export default function PresetModelViewer({
           <group scale={1.8}>
             <MeshComponent
               baseColor={baseColor}
+              backColor={backColor}
               borderColor={borderColor}
               thickness={thickness}
               border={border}

@@ -58,6 +58,7 @@ export default function OptionsPresets({
   const [uploading, setUploading] = React.useState(false);
   const [baseColor, setBaseColor] = React.useState('#7dd3fc');
   const [borderColor, setBorderColor] = React.useState('#7dd3fc');
+  const [backColor, setBackColor] = React.useState('#7dd3fc');
 
   // SVG mode state
   const [buildFromSvg, setBuildFromSvg] = React.useState(false);
@@ -281,6 +282,15 @@ export default function OptionsPresets({
                     className="w-40"
                   />
                 </div>
+                <div className="flex flex-col items-start gap-2">
+                  <Label className="text-xs text-muted-foreground">Tapa</Label>
+                  <ColorInput
+                    id="color-back"
+                    value={backColor}
+                    onChange={setBackColor}
+                    className="w-40"
+                  />
+                </div>
               </div>
             </div>
             <div className="space-y-2">
@@ -372,6 +382,7 @@ export default function OptionsPresets({
             <SvgPresetComposer
               kind={selectedPresetKind}
               baseColor={baseColor}
+              backColor={backColor}
               borderColor={borderColor}
               result={svgResult}
               depthMap={depthMap}
@@ -384,6 +395,7 @@ export default function OptionsPresets({
               kind={selectedPresetKind}
               textureUrl={textureUrl}
               baseColor={baseColor}
+              backColor={backColor}
               borderColor={borderColor}
             />
           )}
