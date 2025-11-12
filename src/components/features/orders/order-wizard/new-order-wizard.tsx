@@ -198,7 +198,9 @@ export default function NewOrderWizard() {
 
     // Parametros por nueva especificación
     const parametros = {
-      color: [String((o as any).baseColor ?? ''), String((o as any).borderColor ?? '')].filter(
+      color: [String((o as any).baseColor ?? ''), String((o as any).borderColor ?? ''),
+        String((o as any).backColor ?? '')
+      ].filter(
         (c) => c !== ''
       ),
       alto: stats.alto,
