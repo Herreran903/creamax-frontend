@@ -344,6 +344,7 @@ export interface SvgPresetComposerProps {
   baseColor?: string;
   backColor?: string;
   borderColor?: string;
+  showBorder?: boolean;
   result: SvgProcessResult | null;
   depthMap: DepthMap;
   selectedHex?: string | null;
@@ -357,6 +358,7 @@ export default function SvgPresetComposer({
   baseColor = '#7dd3fc',
   backColor = baseColor,
   borderColor = '#7dd3fc',
+  showBorder = true,
   result,
   depthMap,
   selectedHex,
@@ -512,6 +514,7 @@ export default function SvgPresetComposer({
                 thickness={thickness}
                 border={border}
                 reliefDepth={reliefDepth}
+                showBorder={showBorder}
               />
 
               {/* SVG extruido arriba del plano (solo +Z) */}

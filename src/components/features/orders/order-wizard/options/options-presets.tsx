@@ -59,6 +59,7 @@ export default function OptionsPresets({
   const [baseColor, setBaseColor] = React.useState('#7dd3fc');
   const [borderColor, setBorderColor] = React.useState('#7dd3fc');
   const [backColor, setBackColor] = React.useState('#7dd3fc');
+  const [showBorder, setShowBorder] = React.useState(true);
 
   // SVG mode state
   const [buildFromSvg, setBuildFromSvg] = React.useState(false);
@@ -260,9 +261,22 @@ export default function OptionsPresets({
               ) : null}
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-bold tracking-wide text-foreground/80 flex">
-                <Palette className="h-4 w-4 mr-1" /> COLORES
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold tracking-wide text-foreground/80 flex">
+                  <Palette className="h-4 w-4 mr-1" /> COLORES
+                </Label>
+                {buildFromSvg && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground">Mostrar borde</span>
+                    <Switch
+                      id="show-border"
+                      checked={showBorder}
+                      onCheckedChange={(v) => setShowBorder(Boolean(v))}
+                      size="sm"
+                    />
+                  </div>
+                )}
+              </div>
               <div className="flex gap-3">
                 <div className="flex flex-col items-start gap-2">
                   <Label className="text-xs text-muted-foreground">Base</Label>
@@ -273,15 +287,17 @@ export default function OptionsPresets({
                     className="w-40"
                   />
                 </div>
-                <div className="flex flex-col items-start gap-2">
-                  <Label className="text-xs text-muted-foreground">Borde</Label>
-                  <ColorInput
-                    id="color-border"
-                    value={borderColor}
-                    onChange={setBorderColor}
-                    className="w-40"
-                  />
-                </div>
+                {(!buildFromSvg || showBorder) && (
+                  <div className="flex flex-col items-start gap-2">
+                    <Label className="text-xs text-muted-foreground">Borde</Label>
+                    <ColorInput
+                      id="color-border"
+                      value={borderColor}
+                      onChange={setBorderColor}
+                      className="w-40"
+                    />
+                  </div>
+                )}
                 <div className="flex flex-col items-start gap-2">
                   <Label className="text-xs text-muted-foreground">Tapa</Label>
                   <ColorInput
@@ -384,6 +400,7 @@ export default function OptionsPresets({
               baseColor={baseColor}
               backColor={backColor}
               borderColor={borderColor}
+              showBorder={showBorder}
               result={svgResult}
               depthMap={depthMap}
               selectedHex={selectedHex}

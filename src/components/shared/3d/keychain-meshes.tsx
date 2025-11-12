@@ -13,6 +13,7 @@ type KeychainProps = {
   reliefDepth?: number; // altura del marco
   cornerRadius?: number;
   frontFaceDepth?: number; // grosor de la lámina frontal
+  showBorder?: boolean; // mostrar marco/relieve frontal (default: true)
 };
 
 const CURVE_SEGMENTS = 96;
@@ -96,6 +97,7 @@ function KeychainBase({
   border = 0.05,
   reliefDepth = 0.06,
   frontFaceDepth = 0.003, // lámina delantera muy fina
+  showBorder = true,
 }: {
   shape: THREE.Shape;
   frameShape: THREE.Shape;
@@ -107,6 +109,7 @@ function KeychainBase({
   border?: number;
   reliefDepth?: number;
   frontFaceDepth?: number;
+  showBorder?: boolean;
 }) {
   const back = backColor ?? baseColor;
 
@@ -171,16 +174,18 @@ function KeychainBase({
       </mesh>
 
       {/* FRAME (marco/relieve frontal) */}
-      <mesh geometry={frameGeom} position={[0, 0, frameZ]}>
-        <meshStandardMaterial
-          color={borderColor}
-          metalness={0.35}
-          roughness={0.4}
-          polygonOffset
-          polygonOffsetFactor={1}
-          polygonOffsetUnits={1}
-        />
-      </mesh>
+      {showBorder && (
+        <mesh geometry={frameGeom} position={[0, 0, frameZ]}>
+          <meshStandardMaterial
+            color={borderColor}
+            metalness={0.35}
+            roughness={0.4}
+            polygonOffset
+            polygonOffsetFactor={1}
+            polygonOffsetUnits={1}
+          />
+        </mesh>
+      )}
     </group>
   );
 }

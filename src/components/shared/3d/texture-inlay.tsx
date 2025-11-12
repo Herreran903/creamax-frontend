@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import * as THREE from 'three';
-import { useThree } from '@react-three/fiber';
+import { useThree, invalidate } from '@react-three/fiber';
 
 type FitMode = 'cover' | 'contain' | 'stretch';
 
@@ -20,10 +20,21 @@ type Props = {
   enableAnisotropy?: boolean;
   onChange?: (state: { zoom: number; pan: { x: number; y: number } }) => void;
   controlsRef?: React.RefObject<any>;
+  onLoaded?: () => void; // <-- opcional, por si quieres saber cuándo quedó lista
 };
 
 function clamp(v: number, a: number, b: number) {
   return Math.max(a, Math.min(b, v));
+}
+
+function setTextureSRGB(tex: THREE.Texture) {
+  // r152+ usa colorSpace
+  if ('colorSpace' in tex) {
+    (tex as any).colorSpace = (THREE as any).SRGBColorSpace;
+  } else {
+    // r151 y anteriores
+    (tex as any).encoding = (THREE as any).sRGBEncoding;
+  }
 }
 
 export default function TextureInlay({
@@ -41,6 +52,7 @@ export default function TextureInlay({
   enableAnisotropy = true,
   onChange,
   controlsRef,
+  onLoaded,
 }: Props) {
   const { gl } = useThree();
   const [tex, setTex] = React.useState<THREE.Texture | null>(texture ?? null);
@@ -50,70 +62,80 @@ export default function TextureInlay({
   const [zoom, setZoom] = React.useState(initialZoom);
   const [pan, setPan] = React.useState({ x: 0, y: 0 });
 
+  // --- Carga de textura (primer render) + invalidate() al terminar
   React.useEffect(() => {
-    if (!textureUrl) return;
-    const loader = new THREE.TextureLoader();
+    if (!textureUrl) {
+      setTex(null);
+      return;
+    }
     let alive = true;
+    const loader = new THREE.TextureLoader();
     loader.load(
       textureUrl,
-      (t) => alive && setTex(t),
+      (t) => {
+        if (!alive) return;
+        setTextureSRGB(t);
+        t.flipY = false;
+        t.minFilter = THREE.LinearMipmapLinearFilter;
+        t.magFilter = THREE.LinearFilter;
+        t.generateMipmaps = true;
+
+        if (enableAnisotropy && 'capabilities' in gl) {
+          const maxAniso = (gl as any).capabilities?.getMaxAnisotropy?.() ?? 0;
+          if (maxAniso > 0) t.anisotropy = Math.min(8, maxAniso);
+        }
+
+        t.wrapS = THREE.ClampToEdgeWrapping;
+        t.wrapT = THREE.ClampToEdgeWrapping;
+        t.needsUpdate = true;
+
+        setTex(t);
+        invalidate(); // ⬅️ fuerza render inmediato
+        onLoaded?.();
+      },
       undefined,
-      () => setTex(null)
+      () => {
+        setTex(null);
+        invalidate();
+      }
     );
     return () => {
       alive = false;
     };
-  }, [textureUrl]);
+  }, [textureUrl, gl, enableAnisotropy, onLoaded]);
 
+  // --- Crear material una sola vez (no depende de tex)
   React.useEffect(() => {
     if (material) {
       matRef.current = material;
-      if (tex && !material.map) {
-        material.map = tex;
-        material.needsUpdate = true;
-      }
       return;
     }
     const m = new THREE.MeshStandardMaterial({ color: 'white', roughness: 0.9, metalness: 0.05 });
     matRef.current = m;
     return () => m.dispose?.();
-  }, [material, tex]);
+  }, [material]);
 
+  // --- Cuando hay textura, asignarla al material existente
   React.useEffect(() => {
-    if (!matRef.current) return;
-    if (!tex) {
-      matRef.current.map = null;
-      matRef.current.needsUpdate = true;
-      return;
-    }
+    const m = matRef.current;
+    if (!m) return;
+    m.map = tex ?? null;
+    m.needsUpdate = true;
+    invalidate(); // asegura el primer frame con map asignado
+  }, [tex]);
 
-    tex.wrapS = THREE.ClampToEdgeWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-
-    (tex as any).colorSpace = (THREE as any).SRGBColorSpace ?? (THREE as any).sRGBEncoding;
-
-    tex.flipY = false;
-
-    if (enableAnisotropy && 'capabilities' in gl) {
-      const maxAniso = (gl as any).capabilities?.getMaxAnisotropy?.() ?? 0;
-      if (maxAniso > 0) tex.anisotropy = Math.min(8, maxAniso);
-    }
-
-    matRef.current.map = tex;
-    matRef.current.needsUpdate = true;
-  }, [tex, gl, enableAnisotropy]);
-
+  // --- Tamaño del rectángulo de inlay
   const rect = React.useMemo(() => {
-    const bbox = new THREE.Box3().setFromBufferAttribute(
-      geometry.getAttribute('position') as THREE.BufferAttribute
-    );
+    const pos = geometry.getAttribute('position') as THREE.BufferAttribute;
+    const bbox = new THREE.Box3().setFromBufferAttribute(pos);
     const size = new THREE.Vector3();
     bbox.getSize(size);
     return { w: size.x || 1, h: size.y || 1 };
   }, [geometry]);
 
+  // --- UV transform (repeat/offset) + invalidate en cada cambio visible
   React.useLayoutEffect(() => {
-    if (!tex || !matRef.current) return;
+    if (!tex) return;
 
     const imgW = (tex.image as HTMLImageElement | HTMLCanvasElement | undefined)?.width ?? 1;
     const imgH = (tex.image as HTMLImageElement | HTMLCanvasElement | undefined)?.height ?? 1;
@@ -121,8 +143,7 @@ export default function TextureInlay({
     const sx = rect.w / imgW;
     const sy = rect.h / imgH;
 
-    let repX: number;
-    let repY: number;
+    let repX: number, repY: number;
 
     if (fitMode === 'stretch') {
       repX = 1 / (sx * zoom);
@@ -147,8 +168,11 @@ export default function TextureInlay({
     tex.repeat.set(flipX ? -repX : repX, flipY ? -repY : repY);
     tex.offset.set(pX, pY);
     tex.needsUpdate = true;
+
+    invalidate(); // ⬅️ cada cambio de zoom/pan aplica en el frame siguiente
   }, [tex, rect.w, rect.h, fitMode, zoom, pan.x, pan.y, flipX, flipY]);
 
+  // --- Drag/zoom (sin cambios, salvo invalidate implícito arriba)
   const dragState = React.useRef<{ down: boolean; px: number; py: number } | null>(null);
   const setControlsEnabled = (v: boolean) => {
     const c = controlsRef?.current;
