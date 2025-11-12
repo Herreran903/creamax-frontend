@@ -83,16 +83,14 @@ export default function NewOrderWizard() {
             alto: null as number | null,
             ancho: null as number | null,
             profundidad: null as number | null,
-            uv_map: null as
-              | {
-                  hasUV: boolean;
-                  vertexCount: number;
-                  triangleCount: number;
-                  materialsCount?: number;
-                  area?: number | null;
-                  volumen?: number | null;
-                }
-              | null,
+            uv_map: null as {
+              hasUV: boolean;
+              vertexCount: number;
+              triangleCount: number;
+              materialsCount?: number;
+              area?: number | null;
+              volumen?: number | null;
+            } | null,
           };
         }
         const rootAny: any = (amState as any).data;
@@ -161,12 +159,10 @@ export default function NewOrderWizard() {
       url: null as string | null,
       svg: null as string | null,
       textura_imagen: null as string | null,
-      parametros_generacion_ai: null as
-        | {
-            text_prompt?: string;
-            imagen_prompt?: any | null;
-          }
-        | null,
+      parametros_generacion_ai: null as {
+        text_prompt?: string;
+        imagen_prompt?: any | null;
+      } | null,
     };
 
     if (fuente_modelo === 'ai') {

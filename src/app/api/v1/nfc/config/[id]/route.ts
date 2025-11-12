@@ -13,7 +13,7 @@ export async function OPTIONS() {
   return withCors(res);
 }
 
-    const useMock = false
+const useMock = false;
 
 export async function GET(req: NextRequest, ctx: any) {
   try {

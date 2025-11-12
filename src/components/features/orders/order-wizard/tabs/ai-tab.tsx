@@ -60,7 +60,16 @@ export default function AiTab(_props: AiTabProps) {
         createdAt: Date.now(),
       });
     }
-  }, [canGenerate, createTask, imageUrl, imageFileToken, imageObject, prompt, setLoading, setError]);
+  }, [
+    canGenerate,
+    createTask,
+    imageUrl,
+    imageFileToken,
+    imageObject,
+    prompt,
+    setLoading,
+    setError,
+  ]);
 
   React.useEffect(() => {
     if (status === 'RUNNING' || status === 'PENDING') {
