@@ -56,10 +56,15 @@ export default function OptionsPresets({
 
   const [textureUrl, setTextureUrl] = React.useState<string | null>(null);
   const [uploading, setUploading] = React.useState(false);
-  const [baseColor, setBaseColor] = React.useState('#7dd3fc');
-  const [borderColor, setBorderColor] = React.useState('#7dd3fc');
-  const [backColor, setBackColor] = React.useState('#7dd3fc');
-  const [showBorder, setShowBorder] = React.useState(true);
+  const baseColor = o.baseColor || '#7dd3fc';
+  const borderColor = o.borderColor || '#0284c7';
+  const backColor = o.backColor || '#7dd3fc';
+  const showBorder = o.showBorder ?? true;
+
+  const setBaseColor = (c: string) => o.setBaseColor(c);
+  const setBorderColor = (c: string) => o.setBorderColor(c);
+  const setBackColor = (c: string) => o.setBackColor(c);
+  const setShowBorder = (v: boolean) => o.setShowBorder(v);
 
   // SVG mode state
   const [buildFromSvg, setBuildFromSvg] = React.useState(false);
@@ -280,7 +285,12 @@ export default function OptionsPresets({
               <div className="flex gap-3">
                 <div className="flex flex-col items-start gap-2">
                   <Label className="text-xs text-muted-foreground">Base</Label>
-                  <ColorInput id="color-base" value={baseColor} onChange={setBaseColor} className="w-40" />
+                  <ColorInput
+                    id="color-base"
+                    value={baseColor}
+                    onChange={setBaseColor}
+                    className="w-40"
+                  />
                 </div>
                 {(!buildFromSvg || showBorder) && (
                   <div className="flex flex-col items-start gap-2">
@@ -389,7 +399,7 @@ export default function OptionsPresets({
           </div>
         </div>
         <div className="md:col-span-2">
-            {buildFromSvg ? (
+          {buildFromSvg ? (
             <SvgPresetComposer
               kind={selectedPresetKind}
               baseColor={baseColor}

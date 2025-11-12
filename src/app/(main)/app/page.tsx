@@ -316,7 +316,8 @@ export default function AppHome() {
                               Precio unidad
                             </span>
                             <span className="font-medium tabular-nums text-foreground">
-                              {q.precio_final_unidad === 0 && q.estado.toLowerCase().includes('precot')
+                              {q.precio_final_unidad === 0 &&
+                              q.estado.toLowerCase().includes('precot')
                                 ? 'Precio por definir'
                                 : `$${formatMoneyCLP(q.precio_final_unidad)}`}
                             </span>
