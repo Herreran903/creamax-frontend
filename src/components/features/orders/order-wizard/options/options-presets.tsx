@@ -280,12 +280,7 @@ export default function OptionsPresets({
               <div className="flex gap-3">
                 <div className="flex flex-col items-start gap-2">
                   <Label className="text-xs text-muted-foreground">Base</Label>
-                  <ColorInput
-                    id="color-base"
-                    value={baseColor}
-                    onChange={setBaseColor}
-                    className="w-40"
-                  />
+                  <ColorInput id="color-base" value={baseColor} onChange={setBaseColor} className="w-40" />
                 </div>
                 {(!buildFromSvg || showBorder) && (
                   <div className="flex flex-col items-start gap-2">
@@ -394,7 +389,7 @@ export default function OptionsPresets({
           </div>
         </div>
         <div className="md:col-span-2">
-          {buildFromSvg ? (
+            {buildFromSvg ? (
             <SvgPresetComposer
               kind={selectedPresetKind}
               baseColor={baseColor}

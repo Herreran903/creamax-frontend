@@ -23,7 +23,7 @@ export const PRESETS: ModelPredesign3D[] = [
     name: 'Llavero Rectangular',
     kind: 'rect',
     category: 'keychain',
-    price: 10000,
+    price: 15000,
     source: 'internal',
   },
   {
@@ -31,7 +31,7 @@ export const PRESETS: ModelPredesign3D[] = [
     name: 'Llavero Circular',
     kind: 'circle',
     category: 'keychain',
-    price: 10000,
+    price: 20000,
     source: 'internal',
   },
 ];
