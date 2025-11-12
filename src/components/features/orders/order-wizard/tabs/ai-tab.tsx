@@ -7,7 +7,7 @@ import { Hammer, Image, TextInitial } from 'lucide-react';
 import { useTripoTask, MAX_WAIT_MS as MAX_WAIT_MS_EXPORT } from '@/hooks/use-tripo-task';
 import { Label } from '@/components/ui/label';
 import { useActiveModel } from '@/stores/active-model';
-import { GLTFLoader } from 'three-stdlib';
+import { GLTFLoader, FBXLoader } from 'three-stdlib';
 import * as THREE from 'three';
 import PreviewStage from '../preview-stage';
 import { StatusPanel } from '@/components/shared';
@@ -22,7 +22,9 @@ export default function AiTab(_props: AiTabProps) {
   const [imageFileToken, setImageFileToken] = React.useState('');
   const [imageObject, setImageObject] = React.useState<any | null>(null);
 
-  const { taskId, status, progress, previewUrl, glbUrl, error, createTask } = useTripoTask();
+  const { taskId, status, progress, previewUrl, glbUrl, fbxUrl, error, createTask } =
+    useTripoTask();
+  const assetUrl = glbUrl ?? fbxUrl ?? null;
   const MAX_WAIT_MS = MAX_WAIT_MS_EXPORT;
 
   const { setLoading, setProgress: setAMProgress, setReady, setError } = useActiveModel();
@@ -85,39 +87,73 @@ export default function AiTab(_props: AiTabProps) {
 
   React.useEffect(() => {
     const loadAndSet = async () => {
-      if (!glbUrl || didEmitRef.current) return;
+      const url = glbUrl ?? fbxUrl;
+      if (!url || didEmitRef.current) return;
       try {
-        const proxied = `/api/tripo/proxy?url=${encodeURIComponent(glbUrl)}`;
-        const loader = new GLTFLoader();
-        const gltf = await loader.loadAsync(proxied);
+        const proxied = `/api/tripo/proxy?url=${encodeURIComponent(url)}`;
 
         let triangles = 0;
         let materials = 0;
-        gltf.scene.traverse((obj: any) => {
-          if (obj.isMesh) {
-            const g = obj.geometry as THREE.BufferGeometry;
-            if (g) {
-              const index = g.getIndex();
-              const pos = g.getAttribute('position');
-              if (index) triangles += index.count / 3;
-              else if (pos) triangles += pos.count / 3;
-            }
-            if (obj.material) {
-              if (Array.isArray(obj.material)) materials += obj.material.length;
-              else materials += 1;
-            }
-          }
-        });
 
-        setReady(gltf, {
-          name: 'Modelo IA',
-          format: 'glb',
-          triangles,
-          materials,
-          sizeMB: undefined,
-          source: 'ai',
-          createdAt: Date.now(),
-        });
+        if (glbUrl) {
+          const loader = new GLTFLoader();
+          const gltf = await loader.loadAsync(proxied);
+          gltf.scene.traverse((obj: any) => {
+            if (obj.isMesh) {
+              const g = obj.geometry as THREE.BufferGeometry;
+              if (g) {
+                const index = g.getIndex();
+                const pos = g.getAttribute('position');
+                if (index) triangles += index.count / 3;
+                else if (pos) triangles += pos.count / 3;
+              }
+              if (obj.material) {
+                if (Array.isArray(obj.material)) materials += obj.material.length;
+                else materials += 1;
+              }
+            }
+          });
+          setReady(gltf, {
+            name: 'Modelo IA',
+            // Mantener "glb" para compatibilidad de tipos en el store
+            format: 'glb',
+            triangles,
+            materials,
+            sizeMB: undefined,
+            source: 'ai',
+            createdAt: Date.now(),
+          });
+        } else if (fbxUrl) {
+          const loader = new FBXLoader();
+          const obj = await loader.loadAsync(proxied);
+          obj.traverse((node: any) => {
+            if (node?.isMesh) {
+              const g = node.geometry as THREE.BufferGeometry | undefined;
+              if (g) {
+                const index = g.getIndex();
+                const pos = g.getAttribute('position');
+                if (index) triangles += Math.floor(index.count / 3);
+                else if (pos) triangles += Math.floor(pos.count / 3);
+              }
+              if (node.material) {
+                if (Array.isArray(node.material)) materials += node.material.length;
+                else materials += 1;
+              }
+            }
+          });
+          // Para FBX pasamos el Object3D directamente; el store ya soporta .scene || objeto
+          setReady(obj, {
+            name: 'Modelo IA',
+            // Mantener "glb" por compatibilidad del union type actual
+            format: 'glb',
+            triangles,
+            materials,
+            sizeMB: undefined,
+            source: 'ai',
+            createdAt: Date.now(),
+          });
+        }
+
         didEmitRef.current = true;
       } catch (e) {
         setError('No se pudo cargar el modelo generado por IA.', {
@@ -128,7 +164,7 @@ export default function AiTab(_props: AiTabProps) {
       }
     };
     void loadAndSet();
-  }, [glbUrl, setReady, setError]);
+  }, [glbUrl, fbxUrl, setReady, setError]);
 
   const onDropImages = async (files: File[]) => {
     if (!files?.length) return;
@@ -277,9 +313,9 @@ export default function AiTab(_props: AiTabProps) {
         <div className="md:col-span-2">
           <PreviewStage
             state={
-              glbUrl ? 'ready' : status === 'RUNNING' || status === 'PENDING' ? 'loading' : 'idle'
+              assetUrl ? 'ready' : status === 'RUNNING' || status === 'PENDING' ? 'loading' : 'idle'
             }
-            glbUrl={glbUrl ? `/api/tripo/proxy?url=${encodeURIComponent(glbUrl)}` : null}
+            glbUrl={assetUrl ? `/api/tripo/proxy?url=${encodeURIComponent(assetUrl)}` : null}
             imageUrl={previewUrl || null}
             progress={typeof progress === 'number' ? progress : null}
             messages={[
