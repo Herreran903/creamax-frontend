@@ -280,6 +280,15 @@ export async function POST(req: Request) {
         payload.prompt = String(prompt).trim();
         maybeAssign('negative_prompt', negative_prompt);
         maybeAssign('image_seed', image_seed);
+
+        // Cost-saving defaults for text_to_model: disable textures unless explicitly requested
+        if (typeof payload.texture === 'undefined' && typeof texture === 'undefined') {
+          payload.texture = false;
+        }
+        if (typeof payload.pbr === 'undefined' && typeof pbr === 'undefined') {
+          payload.pbr = false;
+        }
+
         break;
       }
       case 'image_to_model': {
@@ -402,6 +411,14 @@ export async function POST(req: Request) {
         // Only include face_limit if established (either provided or derived)
         if (typeof effectiveFaceLimit !== 'undefined') {
           payload.face_limit = effectiveFaceLimit;
+        }
+
+        // Cost-saving defaults for image_to_model: disable textures unless explicitly requested
+        if (typeof payload.texture === 'undefined' && typeof texture === 'undefined') {
+          payload.texture = false;
+        }
+        if (typeof payload.pbr === 'undefined' && typeof pbr === 'undefined') {
+          payload.pbr = false;
         }
 
         // If texture is false (either by client or due to generate_parts), remove texture-only fields
