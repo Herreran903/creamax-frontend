@@ -40,6 +40,7 @@ export function useTripoTask() {
   const [progress, setProgress] = useState<number | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [glbUrl, setGlbUrl] = useState<string | null>(null);
+  const [fbxUrl, setFbxUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -66,6 +67,7 @@ export function useTripoTask() {
   const reset = useCallback((): void => {
     setError(null);
     setGlbUrl(null);
+    setFbxUrl(null);
     setPreviewUrl(null);
     setProgress(null);
     setStatus(null);
@@ -92,6 +94,7 @@ export function useTripoTask() {
         setStatus(st);
         if (typeof data.progress === 'number') setProgress(data.progress);
         if (data.previewUrl) setPreviewUrl(data.previewUrl ?? null);
+        if (data.fbxUrl) setFbxUrl(data.fbxUrl ?? null);
 
         if (st === 'FAILED') {
           const serverMsg = (data && (data.errorMessage || data.error || data.message)) || null;
@@ -109,8 +112,9 @@ export function useTripoTask() {
         }
 
         if (st === 'SUCCEEDED') {
-          if (data.glbUrl) {
-            setGlbUrl(data.glbUrl);
+          if (data.glbUrl || data.fbxUrl) {
+            if (data.glbUrl) setGlbUrl(data.glbUrl);
+            if (data.fbxUrl) setFbxUrl(data.fbxUrl);
             stopPolling();
             return;
           }
@@ -209,14 +213,20 @@ export function useTripoTask() {
 
   useEffect(() => {
     const onVis = () => {
-      if (document.visibilityState === 'visible' && taskId && !glbUrl && status !== 'FAILED') {
+      if (
+        document.visibilityState === 'visible' &&
+        taskId &&
+        !glbUrl &&
+        !fbxUrl &&
+        status !== 'FAILED'
+      ) {
         backoffRef.current = POLL_BASE_MS;
         scheduleNext(taskId, 0);
       }
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
-  }, [taskId, glbUrl, status, scheduleNext]);
+  }, [taskId, glbUrl, fbxUrl, status, scheduleNext]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
 
@@ -226,6 +236,7 @@ export function useTripoTask() {
     progress,
     previewUrl,
     glbUrl,
+    fbxUrl,
     error,
     createTask,
     startPolling,

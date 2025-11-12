@@ -56,11 +56,15 @@ export default function OptionsPresets({
 
   const [textureUrl, setTextureUrl] = React.useState<string | null>(null);
   const [uploading, setUploading] = React.useState(false);
-  // Use colors from Order context so they are available when building the contract
-  const baseColor = o.baseColor;
-  const setBaseColor = o.setBaseColor;
-  const borderColor = o.borderColor;
-  const setBorderColor = o.setBorderColor;
+  const baseColor = o.baseColor || '#7dd3fc';
+  const borderColor = o.borderColor || '#0284c7';
+  const backColor = o.backColor || '#7dd3fc';
+  const showBorder = o.showBorder ?? true;
+
+  const setBaseColor = (c: string) => o.setBaseColor(c);
+  const setBorderColor = (c: string) => o.setBorderColor(c);
+  const setBackColor = (c: string) => o.setBackColor(c);
+  const setShowBorder = (v: boolean) => o.setShowBorder(v);
 
   // SVG mode state
   const [buildFromSvg, setBuildFromSvg] = React.useState(false);
@@ -262,17 +266,51 @@ export default function OptionsPresets({
               ) : null}
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-bold tracking-wide text-foreground/80 flex">
-                <Palette className="h-4 w-4 mr-1" /> COLORES
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold tracking-wide text-foreground/80 flex">
+                  <Palette className="h-4 w-4 mr-1" /> COLORES
+                </Label>
+                {buildFromSvg && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground">Mostrar borde</span>
+                    <Switch
+                      id="show-border"
+                      checked={showBorder}
+                      onCheckedChange={(v) => setShowBorder(Boolean(v))}
+                      size="sm"
+                    />
+                  </div>
+                )}
+              </div>
               <div className="flex gap-3">
                 <div className="flex flex-col items-start gap-2">
                   <Label className="text-xs text-muted-foreground">Base</Label>
-                  <ColorInput id="color-base" value={baseColor} onChange={setBaseColor} className="w-40" />
+                  <ColorInput
+                    id="color-base"
+                    value={baseColor}
+                    onChange={setBaseColor}
+                    className="w-40"
+                  />
                 </div>
+                {(!buildFromSvg || showBorder) && (
+                  <div className="flex flex-col items-start gap-2">
+                    <Label className="text-xs text-muted-foreground">Borde</Label>
+                    <ColorInput
+                      id="color-border"
+                      value={borderColor}
+                      onChange={setBorderColor}
+                      className="w-40"
+                    />
+                  </div>
+                )}
                 <div className="flex flex-col items-start gap-2">
-                  <Label className="text-xs text-muted-foreground">Borde</Label>
-                  <ColorInput id="color-border" value={borderColor} onChange={setBorderColor} className="w-40" />
+                  <Label className="text-xs text-muted-foreground">Tapa</Label>
+                  <ColorInput
+                    id="color-back"
+                    value={backColor}
+                    onChange={setBackColor}
+                    className="w-40"
+                  />
                 </div>
               </div>
             </div>
@@ -361,11 +399,13 @@ export default function OptionsPresets({
           </div>
         </div>
         <div className="md:col-span-2">
-            {buildFromSvg ? (
+          {buildFromSvg ? (
             <SvgPresetComposer
               kind={selectedPresetKind}
-                baseColor={baseColor}
-                borderColor={borderColor}
+              baseColor={baseColor}
+              backColor={backColor}
+              borderColor={borderColor}
+              showBorder={showBorder}
               result={svgResult}
               depthMap={depthMap}
               selectedHex={selectedHex}
@@ -375,9 +415,10 @@ export default function OptionsPresets({
           ) : (
             <PresetModelViewer
               kind={selectedPresetKind}
-                textureUrl={textureUrl}
-                baseColor={baseColor}
-                borderColor={borderColor}
+              textureUrl={textureUrl}
+              baseColor={baseColor}
+              backColor={backColor}
+              borderColor={borderColor}
             />
           )}
         </div>

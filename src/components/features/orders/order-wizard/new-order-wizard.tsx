@@ -83,16 +83,14 @@ export default function NewOrderWizard() {
             alto: null as number | null,
             ancho: null as number | null,
             profundidad: null as number | null,
-            uv_map: null as
-              | {
-                  hasUV: boolean;
-                  vertexCount: number;
-                  triangleCount: number;
-                  materialsCount?: number;
-                  area?: number | null;
-                  volumen?: number | null;
-                }
-              | null,
+            uv_map: null as {
+              hasUV: boolean;
+              vertexCount: number;
+              triangleCount: number;
+              materialsCount?: number;
+              area?: number | null;
+              volumen?: number | null;
+            } | null,
           };
         }
         const rootAny: any = (amState as any).data;
@@ -154,7 +152,7 @@ export default function NewOrderWizard() {
     const stats = computeStatsFromActiveModel();
     const isPreset = fuente_modelo === 'svg' || fuente_modelo === 'texture_image';
 
-    const selectedPreset = PRESETS.find(p => p.id === selectedPresetId);
+    const selectedPreset = PRESETS.find((p) => p.id === selectedPresetId);
     const basePrice = isPreset && selectedPreset ? selectedPreset.price : 10000;
 
     // Model refs per new schema
@@ -164,12 +162,10 @@ export default function NewOrderWizard() {
       url: null as string | null,
       svg: null as string | null,
       textura_imagen: null as string | null,
-      parametros_generacion_ai: null as
-        | {
-            text_prompt?: string;
-            imagen_prompt?: any | null;
-          }
-        | null,
+      parametros_generacion_ai: null as {
+        text_prompt?: string;
+        imagen_prompt?: any | null;
+      } | null,
       precio_base: basePrice,
     };
 
@@ -202,10 +198,9 @@ export default function NewOrderWizard() {
 
     // Parametros por nueva especificación
     const parametros = {
-      color: [
-        String((o as any).baseColor ?? ''),
-        String((o as any).borderColor ?? ''),
-      ].filter(c => c !== ''),
+      color: [String((o as any).baseColor ?? ''), String((o as any).borderColor ?? '')].filter(
+        (c) => c !== ''
+      ),
       alto: stats.alto,
       ancho: stats.ancho,
       profundidad: stats.profundidad,

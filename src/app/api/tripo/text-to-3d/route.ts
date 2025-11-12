@@ -280,63 +280,154 @@ export async function POST(req: Request) {
         payload.prompt = String(prompt).trim();
         maybeAssign('negative_prompt', negative_prompt);
         maybeAssign('image_seed', image_seed);
+
+        // Cost-saving defaults for text_to_model: disable textures unless explicitly requested
+        if (typeof payload.texture === 'undefined' && typeof texture === 'undefined') {
+          payload.texture = false;
+        }
+        if (typeof payload.pbr === 'undefined' && typeof pbr === 'undefined') {
+          payload.pbr = false;
+        }
+
         break;
       }
       case 'image_to_model': {
-        // Prefer file_token/object when provided (bypasses public URL requirement)
-        if (typeof imageFileToken === 'string' && imageFileToken.trim()) {
-          // Include type as recommended by docs
-          payload.file = { type: 'jpg', file_token: String(imageFileToken).trim() };
-          break;
+        // Determine single file source (mutually exclusive: file_token | object | url)
+        const hasToken = typeof imageFileToken === 'string' && !!imageFileToken.trim();
+        const hasObj = !!imageObject && typeof imageObject === 'object';
+        const hasUrl = typeof imageUrl === 'string' && !!imageUrl.trim();
+
+        // Enforce exclusivity: only one image source allowed
+        const sources = (hasToken ? 1 : 0) + (hasObj ? 1 : 0) + (hasUrl ? 1 : 0);
+        if (sources > 1) {
+          return NextResponse.json(
+            {
+              error: 'Sólo una fuente de imagen permitida: imageFileToken o imageObject o imageUrl',
+            },
+            { status: 400 }
+          );
         }
-        if (imageObject && typeof imageObject === 'object') {
-          // Map STS/object and include type as recommended by docs.
+
+        if (hasToken) {
+          // Map to Tripo "file.file_token" and include required "type"
+          payload.file = { type: 'jpg', file_token: String(imageFileToken).trim() };
+        } else if (hasObj) {
+          // Normalize common uploader shapes to Tripo "file"
           const obj: any = imageObject;
           const ftype =
-            (typeof obj?.type === 'string' && obj.type) ||
-            (typeof obj?.mime_type === 'string' && (obj.mime_type.includes('png') ? 'png' : 'jpg')) ||
+            (typeof obj?.type === 'string' && (obj.type === 'png' ? 'png' : 'jpg')) ||
+            (typeof obj?.mime_type === 'string' &&
+              (obj.mime_type.includes('png') ? 'png' : 'jpg')) ||
             'jpg';
 
-          if (obj.bucket && obj.key) {
+          // Case: image_token stands for Tripo file_token
+          if (typeof obj?.image_token === 'string' && obj.image_token.trim()) {
+            payload.file = { type: 'jpg', file_token: obj.image_token.trim() };
+          } else if (obj.bucket && obj.key) {
+            // Prefer explicit STS bucket/key when available
             payload.file = { type: ftype, bucket: String(obj.bucket), key: String(obj.key) };
           } else if (obj.object && typeof obj.object === 'object') {
             payload.file = { type: ftype, object: obj.object };
           } else {
+            // Fallback: pass as STS object
             payload.file = { type: ftype, object: obj };
           }
-          break;
+        } else {
+          // URL path; if private/local, reupload to Tripo to get file_token
+          const abs = ensureAbsoluteUrl(req, String(imageUrl));
+          const ext = getExtFromUrl(abs);
+          const inferredType = ext === 'png' ? 'png' : 'jpg';
+
+          if (isPrivateOrLocalUrl(abs)) {
+            try {
+              const token = await uploadUrlToTripo(abs);
+              payload.file = { type: inferredType, file_token: token };
+            } catch (e: any) {
+              return NextResponse.json(
+                { error: e?.message || 'No fue posible subir la imagen a Tripo' },
+                { status: 400 }
+              );
+            }
+          } else {
+            // Public URL path: ensure JPG/PNG and try to validate size ≤ 20MB
+            if (!isSupportedImageExtForImageToModel(ext)) {
+              return NextResponse.json(
+                {
+                  error:
+                    'Formato de imagen no soportado para image_to_model. Usa JPG o PNG (máx. 20MB).',
+                },
+                { status: 415 }
+              );
+            }
+            try {
+              const head = await fetch(abs, { method: 'HEAD', cache: 'no-store' });
+              const len = head.headers.get('content-length');
+              if (len && Number(len) > 20 * 1024 * 1024) {
+                return NextResponse.json(
+                  { error: 'La imagen excede 20MB (límite para URL públicas)' },
+                  { status: 413 }
+                );
+              }
+            } catch {
+              // If HEAD fails, proceed; Tripo will also validate server-side
+            }
+            payload.file = { type: inferredType, url: abs };
+          }
         }
 
-        // Else, use URL. If it's private/local, upload it to Tripo to obtain a file_token.
-        const abs = ensureAbsoluteUrl(req, String(imageUrl));
-        const ext = getExtFromUrl(abs);
-        const inferredType = ext === 'png' ? 'png' : 'jpg';
+        // Compatibility rules for image_to_model
+        let effectiveFaceLimit = face_limit;
 
-        if (isPrivateOrLocalUrl(abs)) {
-          try {
-            const token = await uploadUrlToTripo(abs);
-            payload.file = { type: inferredType, file_token: token };
-          } catch (e: any) {
+        // quad=true with no face_limit -> face_limit=10000
+        if (quad === true && (effectiveFaceLimit === undefined || effectiveFaceLimit === null)) {
+          effectiveFaceLimit = 10000;
+        }
+
+        // smart_low_poly requires face_limit between 1000–16000
+        if (smart_low_poly === true) {
+          const n = Number(effectiveFaceLimit);
+          if (!Number.isFinite(n) || n < 1000 || n > 16000) {
             return NextResponse.json(
-              { error: e?.message || 'No fue posible subir la imagen a Tripo' },
+              { error: 'smart_low_poly=true requiere face_limit entre 1000 y 16000' },
               { status: 400 }
             );
           }
-          break;
         }
 
-        // Public URL path: ensure JPG/PNG per docs
-        if (!isSupportedImageExtForImageToModel(ext)) {
-          return NextResponse.json(
-            {
-              error:
-                'Formato de imagen no soportado para image_to_model. Usa JPG o PNG (máx. 20MB).',
-            },
-            { status: 415 }
-          );
+        // pbr=true implies texture=true
+        if (pbr === true) {
+          payload.pbr = true;
+          payload.texture = true;
         }
 
-        payload.file = { type: inferredType, url: abs };
+        // generate_parts=true forces texture=false, pbr=false, quad=false
+        if (generate_parts === true) {
+          payload.generate_parts = true;
+          payload.texture = false;
+          payload.pbr = false;
+          payload.quad = false;
+        }
+
+        // Only include face_limit if established (either provided or derived)
+        if (typeof effectiveFaceLimit !== 'undefined') {
+          payload.face_limit = effectiveFaceLimit;
+        }
+
+        // Cost-saving defaults for image_to_model: disable textures unless explicitly requested
+        if (typeof payload.texture === 'undefined' && typeof texture === 'undefined') {
+          payload.texture = false;
+        }
+        if (typeof payload.pbr === 'undefined' && typeof pbr === 'undefined') {
+          payload.pbr = false;
+        }
+
+        // If texture is false (either by client or due to generate_parts), remove texture-only fields
+        if (payload.texture === false) {
+          delete payload.texture_alignment;
+          delete payload.texture_quality;
+          delete payload.texture_seed;
+        }
+
         break;
       }
       case 'multiview_to_model': {
@@ -457,7 +548,7 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({ taskId: json.data.task_id });
+    return NextResponse.json({ taskId: json.data.task_id, task_id: json.data.task_id });
   } catch (err) {
     console.error('Error al crear tarea Tripo:', err);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });

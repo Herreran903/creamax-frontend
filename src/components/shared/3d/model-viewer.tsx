@@ -2,7 +2,7 @@
 
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei';
-import { STLLoader, OBJLoader } from 'three-stdlib';
+import { STLLoader, OBJLoader, FBXLoader } from 'three-stdlib';
 import type { GLTF } from 'three-stdlib';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -130,6 +130,60 @@ function STLMesh({ url }: { url: string }) {
       <meshStandardMaterial color="#7dd3fc" metalness={0.3} roughness={0.4} />
     </mesh>
   );
+}
+
+function FBXObject({ url }: { url: string }) {
+  const [obj, setObj] = useState<THREE.Object3D | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    const loader = new FBXLoader();
+
+    // Si el FBX referencia texturas relativas, esto ayuda:
+    try {
+      const u = new URL(url);
+      const base = u.origin + u.pathname.replace(/[^/]+$/, '');
+      loader.setResourcePath(base); // para que cargue texturas a partir del mismo path
+      loader.setCrossOrigin('anonymous');
+    } catch {
+      // url relativa o blob: no pasa nada
+    }
+
+    loader.load(
+      url,
+      (o) => {
+        if (disposed) return;
+        o.traverse((child: any) => {
+          if ((child as THREE.Mesh)?.isMesh) {
+            const mesh = child as THREE.Mesh;
+            // material por defecto si no viene:
+            const hasMaterial =
+              !!mesh.material ||
+              (Array.isArray(mesh.material) && (mesh.material as THREE.Material[])?.length > 0);
+            if (!hasMaterial) {
+              mesh.material = new THREE.MeshStandardMaterial({
+                color: '#cbd5e1',
+                metalness: 0.2,
+                roughness: 0.7,
+              });
+            }
+            const g = mesh.geometry as THREE.BufferGeometry | undefined;
+            if (g && !g.attributes.normal) g.computeVertexNormals();
+          }
+        });
+        setObj(o);
+      },
+      undefined,
+      () => setObj(null)
+    );
+
+    return () => {
+      disposed = true;
+    };
+  }, [url]);
+
+  if (!obj) return null;
+  return <primitive object={obj} dispose={null} />;
 }
 
 // Infer file extension from src
@@ -289,6 +343,8 @@ export default function ModelViewer({
                     <STLMesh url={src!} />
                   ) : ext === 'obj' ? (
                     <OBJObject url={src!} />
+                  ) : ext === 'fbx' ? (
+                    <FBXObject url={src!} />
                   ) : (
                     <GLBObject url={src!} />
                   )}

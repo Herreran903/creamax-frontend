@@ -121,10 +121,12 @@ export default function QuoteReviewStep({
   }, []);
 
   const handleConfirm = async () => {
-    {/*if (!quote?.id) {
+    {
+      /*if (!quote?.id) {
       setConfirmError('No hay cotización válida para confirmar.');
       return;
-    }*/}
+    }*/
+    }
     try {
       setConfirmError(null);
       setConfirming(true);
