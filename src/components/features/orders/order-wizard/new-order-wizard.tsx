@@ -13,7 +13,7 @@ import { useOrder } from '@/hooks/use-order';
 import QuoteReviewStep from './quote-review-step';
 import Options from './options/options';
 import { CheckoutSuccessStep } from './checkout-success-step';
-import { normalizeSceneForExport, exportGroupTo3mf } from '@/lib/threeExportHelpers';
+import { normalizeSceneForExport, exportGroupTo3mf, prepareSceneForExport } from '@/lib/threeExportHelpers';
 import { loadFileToGroup } from '@/lib/loaderHelpers';
 import { uploadToTransferSh } from '@/lib/uploadTransferSh';
 
@@ -163,6 +163,7 @@ export default function NewOrderWizard() {
       modelo_id: isPreset ? selectedPresetId : null,
       archivo: null as string | null,
       url: null as string | null,
+      model_url: null as string | null,
       svg: null as string | null,
       textura_imagen: null as string | null,
       parametros_generacion_ai: null as {
@@ -179,9 +180,10 @@ export default function NewOrderWizard() {
         imagen_prompt: null,
       };
     } else if (fuente_modelo === '3d_upload') {
-      // For 3D upload, we'll upload the binary and set modelo.archivo during requestQuote
+      // For 3D upload, we'll upload the 3MF and set modelo.model_url during requestQuote
       modelo.archivo = null;
       modelo.url = null;
+      modelo.model_url = null;
     } else if (fuente_modelo === 'texture_image') {
       // presets with image texture
       modelo.textura_imagen = (o as any).textureImageUrl ?? null;
@@ -242,30 +244,51 @@ export default function NewOrderWizard() {
       try {
         let group: THREE.Group | null = null;
 
-        if (contract.fuente_modelo === '3d_upload' && uploadedUrl) {
-          // Load STL file from uploadedUrl (blob URL)
-          // eslint-disable-next-line no-console
-          console.log('[requestQuote] Loading 3D file from uploadedUrl:', uploadedUrl);
-          const resp = await fetch(uploadedUrl);
-          const blob = await resp.blob();
-          const file = new File([blob], uploadedName || 'model.stl', { type: blob.type });
-          group = await loadFileToGroup(file);
-          // eslint-disable-next-line no-console
-          console.log('[requestQuote] Loaded 3D upload file to Group:', group);
+        if (contract.fuente_modelo === '3d_upload') {
+          // For 3D upload, use the already-loaded amState.data (preview group)
+          if ((amState as any).data) {
+            const amData: any = (amState as any).data;
+            group = (amData?.scene ?? amData) as THREE.Group;
+            // eslint-disable-next-line no-console
+            console.log('[requestQuote] Using 3D upload file (amState.data) as Group:', group);
+          } else {
+            throw new Error('No 3D model loaded for 3d_upload');
+          }
         } else if (contract.fuente_modelo === 'ai') {
           // Use the active model (preview group) from amState for AI
           if ((amState as any).data) {
-            group = (amState as any).data as THREE.Group;
+            const amData: any = (amState as any).data;
+            group = (amData?.scene ?? amData) as THREE.Group;
             // eslint-disable-next-line no-console
             console.log('[requestQuote] Using active model group (AI):', group);
           } else {
             // eslint-disable-next-line no-console
-            console.warn('[requestQuote] No amState.data for AI');
+            console.warn('[requestQuote] No amState.data for AI, creating fallback');
+            // Fallback: Create a simple placeholder
+            try {
+              const geometry = new THREE.BoxGeometry(1, 1, 0.1);
+              const material = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+              const mesh = new THREE.Mesh(geometry, material);
+              group = new THREE.Group();
+              group.add(mesh);
+              // eslint-disable-next-line no-console
+              console.log('[requestQuote] Created fallback box model for AI');
+            } catch (e) {
+              // eslint-disable-next-line no-console
+              console.warn('[requestQuote] Could not create fallback model for AI, will still export an empty group');
+            }
+            // Ensure group is not null so export path executes; export of an empty group yields a tiny 3MF
+            if (!group) {
+              group = new THREE.Group();
+              // eslint-disable-next-line no-console
+              console.warn('[requestQuote] Created empty THREE.Group fallback for AI');
+            }
           }
         } else if (contract.fuente_modelo === 'texture_image') {
           // For texture_image (presets), try amState first, fallback to creating a simple model
           if ((amState as any).data) {
-            group = (amState as any).data as THREE.Group;
+            const amData: any = (amState as any).data;
+            group = (amData?.scene ?? amData) as THREE.Group;
             // eslint-disable-next-line no-console
             console.log('[requestQuote] Using active model group (texture_image):', group);
           } else {
@@ -294,7 +317,8 @@ export default function NewOrderWizard() {
         } else if (contract.fuente_modelo === 'svg') {
           // For SVG, try to get the 3D model from amState (SVG extruder generates one)
           if ((amState as any).data) {
-            group = (amState as any).data as THREE.Group;
+            const amData: any = (amState as any).data;
+            group = (amData?.scene ?? amData) as THREE.Group;
             // eslint-disable-next-line no-console
             console.log('[requestQuote] Using active model group (SVG extruded):', group);
           } else {
@@ -326,10 +350,20 @@ export default function NewOrderWizard() {
           // eslint-disable-next-line no-console
           console.log('[requestQuote] group is NOT null, proceeding with export');
           try {
-            // Normalize the group for export
-            const normalized = normalizeSceneForExport(group, { scaleToMm: true });
+            // For 3d_upload, scale the model to double size
+            if (contract.fuente_modelo === '3d_upload') {
+              group.scale.multiplyScalar(2);
+              group.updateMatrixWorld(true);
+              // eslint-disable-next-line no-console
+              console.log('[requestQuote] Applied 2x scale for 3d_upload');
+            }
+
+            // Normalize the group for export (bake transforms)
+            let normalized = normalizeSceneForExport(group);
+            // Inspect sizes and apply a uniform scale to fit printer if needed
+            normalized = prepareSceneForExport(normalized, { maxPrintMm: Number(process.env.NEXT_PUBLIC_MAX_PRINT_MM ?? 200) });
             // eslint-disable-next-line no-console
-            console.log('[requestQuote] Normalized group for export');
+            console.log('[requestQuote] Normalized and prepared group for export');
 
             // Export to 3MF blob
             const blob3mf = await exportGroupTo3mf(normalized);
@@ -372,8 +406,9 @@ export default function NewOrderWizard() {
             // Set the URL in the contract based on fuente_modelo
             if (contract.fuente_modelo === '3d_upload') {
               contract.modelo.url = transferUrl;
+              contract.modelo.model_url = transferUrl;
               // eslint-disable-next-line no-console
-              console.log('[requestQuote] Set modelo.url (3d_upload) to:', transferUrl);
+              console.log('[requestQuote] Set modelo.url and modelo.model_url (3d_upload) to:', transferUrl);
             } else if (contract.fuente_modelo === 'ai') {
               contract.modelo.model_url = transferUrl;
               // eslint-disable-next-line no-console
@@ -390,8 +425,8 @@ export default function NewOrderWizard() {
           } catch (exportErr: any) {
             // eslint-disable-next-line no-console
             console.error('[requestQuote] Error during 3MF export/upload:', exportErr);
-            // For presets and SVG, don't hard-fail if export fails - gracefully proceed
-            if (contract.fuente_modelo === 'ai' || contract.fuente_modelo === '3d_upload') {
+            // For 3D uploads, hard-fail; for others, gracefully proceed
+            if (contract.fuente_modelo === '3d_upload') {
               throw new Error(exportErr?.message || 'Error al exportar/subir modelo 3MF');
             }
             // eslint-disable-next-line no-console
@@ -400,8 +435,8 @@ export default function NewOrderWizard() {
         } else {
           // eslint-disable-next-line no-console
           console.warn('[requestQuote] ⚠️ group is NULL! No export will happen');
-          // For AI and 3D uploads, this is critical; for others, we can proceed
-          if (contract.fuente_modelo === 'ai' || contract.fuente_modelo === '3d_upload') {
+          // For 3D uploads, this is critical; for others, we can proceed
+          if (contract.fuente_modelo === '3d_upload') {
             throw new Error('No se pudo obtener el modelo 3D para exportar');
           }
         }

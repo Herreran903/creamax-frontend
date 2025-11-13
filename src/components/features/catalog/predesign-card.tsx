@@ -104,12 +104,6 @@ export default function PredesignCard({
         >
           {m.name}
         </h3>
-
-        {priceFmt ? (
-          <p className="mt-1.5 sm:mt-2 text-[12px] sm:text-[13px] font-semibold tracking-tight">
-            {priceFmt}
-          </p>
-        ) : null}
       </div>
     </Card>
   );

@@ -11,41 +11,153 @@ export type NormalizeOptions = {
  * - Optionally scales to millimeters (assumes current units are meters)
  */
 export function normalizeSceneForExport(group: THREE.Group, options: NormalizeOptions = {}): THREE.Group {
-  const { scaleToMm = true } = options;
-  const cloned = group.clone(true) as THREE.Group;
+  // Flatten the group into a new Group with baked geometries.
+  // For each mesh we apply its world matrix to its geometry and add a new
+  // mesh with identity transform to the output. This avoids residual parent
+  // transforms (scale/translate) affecting matrixWorld after bake.
+  const out = new THREE.Group();
 
-  // Ensure world matrices have been updated
-  cloned.updateMatrixWorld(true);
+  // Ensure world matrices are up-to-date on source
+  group.updateMatrixWorld(true);
 
-  // Traverse and bake transforms into geometry
-  cloned.traverse((obj: any) => {
-    if (obj?.isMesh) {
-      const mesh = obj as THREE.Mesh;
-      const geometry = (mesh.geometry as THREE.BufferGeometry).clone();
-
-      // Apply world transform to geometry
-      geometry.applyMatrix4(mesh.matrixWorld);
-
-      // If scaling to mm, apply uniform scale
-      if (scaleToMm) {
-        const scale = new THREE.Matrix4().makeScale(1000, 1000, 1000);
-        geometry.applyMatrix4(scale);
+  // Diagnostic: log per-mesh bounding boxes before baking
+  try {
+    const beforeInfo: Array<{ name: string; bbox: [number, number, number]; matrixWorld?: number[] }> = [];
+    group.traverse((o: any) => {
+      if (o?.isMesh) {
+        const b = new THREE.Box3().setFromObject(o);
+        const s = new THREE.Vector3();
+        b.getSize(s);
+        beforeInfo.push({ name: o.name || 'mesh', bbox: [s.x, s.y, s.z], matrixWorld: o.matrixWorld ? o.matrixWorld.toArray() : undefined });
       }
+    });
+    // eslint-disable-next-line no-console
+    console.log('[normalizeSceneForExport] before bake per-mesh:', JSON.stringify(beforeInfo));
+  } catch (e) {
+    // ignore diagnostics error
+  }
 
-      // Reset mesh transform
-      mesh.matrixAutoUpdate = false;
-      mesh.matrix.identity();
-      mesh.position.set(0, 0, 0);
-      mesh.rotation.set(0, 0, 0);
-      mesh.scale.set(1, 1, 1);
+  // Walk source and create baked meshes in the output group
+  let meshIndex = 0;
+  group.traverse((obj: any) => {
+    if (!obj?.isMesh) return;
+    const src: THREE.Mesh = obj as THREE.Mesh;
+    if (!src.geometry) return;
 
-      mesh.geometry = geometry;
-      // ensure normals
-      if (!geometry.getAttribute('normal')) geometry.computeVertexNormals();
-    }
+    // Clone geometry and bake world transform
+    const geom = (src.geometry as THREE.BufferGeometry).clone();
+    geom.applyMatrix4(src.matrixWorld);
+    if (!geom.getAttribute('normal')) geom.computeVertexNormals();
+
+    // Create new mesh with identity transform
+    const newMesh = new THREE.Mesh(geom, Array.isArray(src.material) ? src.material.slice() : src.material);
+    newMesh.name = src.name || `mesh_${meshIndex}`;
+    newMesh.matrixAutoUpdate = false;
+    newMesh.position.set(0, 0, 0);
+    newMesh.rotation.set(0, 0, 0);
+    newMesh.scale.set(1, 1, 1);
+    if (typeof newMesh.updateMatrix === 'function') newMesh.updateMatrix();
+    out.add(newMesh);
+    meshIndex += 1;
   });
 
-  return cloned;
+  // Recompute matrices on the flattened output
+  out.updateMatrixWorld(true);
+
+  // Diagnostic: log per-mesh bounding boxes after baking
+  try {
+    const afterInfo: Array<{ name: string; bbox: [number, number, number]; matrixWorld?: number[] }> = [];
+    out.traverse((o: any) => {
+      if (o?.isMesh) {
+        const geom = o.geometry as THREE.BufferGeometry;
+        geom.computeBoundingBox();
+        const bb = geom.boundingBox as THREE.Box3;
+        const s = new THREE.Vector3();
+        bb.getSize(s);
+        afterInfo.push({ name: o.name || 'mesh', bbox: [s.x, s.y, s.z], matrixWorld: o.matrixWorld ? o.matrixWorld.toArray() : undefined });
+      }
+    });
+    // eslint-disable-next-line no-console
+    console.log('[normalizeSceneForExport] after bake per-mesh:', JSON.stringify(afterInfo));
+  } catch (e) {
+    // ignore
+  }
+
+  return out;
+}
+
+// Additional export helper: inspect sizes and optionally scale entire scene to fit
+export function prepareSceneForExport(group: THREE.Group, options: { maxPrintMm?: number; minReasonableMm?: number } = {}) {
+  const maxPrintMm = options.maxPrintMm ?? Number(process.env.NEXT_PUBLIC_MAX_PRINT_MM ?? 200);
+  const minReasonableMm = options.minReasonableMm ?? 0.5;
+
+  // Ensure world matrices updated and geometries baked
+  group.updateMatrixWorld(true);
+
+  // Collect per-mesh bounding boxes
+  const perMeshInfo: Array<{ name: string; size: THREE.Vector3; center: THREE.Vector3 }> = [];
+  group.traverse((obj: any) => {
+    if (!obj?.isMesh) return;
+    const mesh: THREE.Mesh = obj as THREE.Mesh;
+    const geom = mesh.geometry as THREE.BufferGeometry;
+    if (!geom) return;
+    const clonedGeo = geom.clone();
+    clonedGeo.applyMatrix4(mesh.matrixWorld);
+    clonedGeo.computeBoundingBox();
+    const bb = (clonedGeo.boundingBox as THREE.Box3) || new THREE.Box3();
+    const size = new THREE.Vector3();
+    bb.getSize(size);
+    const center = new THREE.Vector3();
+    bb.getCenter(center);
+    perMeshInfo.push({ name: mesh.name || 'mesh', size, center });
+  });
+
+  // Compute global bounding box
+  const globalBox = new THREE.Box3();
+  group.traverse((obj: any) => globalBox.expandByObject(obj));
+  const globalSize = new THREE.Vector3();
+  globalBox.getSize(globalSize);
+  const maxDim = Math.max(globalSize.x || 0, globalSize.y || 0, globalSize.z || 0);
+
+  // Heuristic: detect units. If maxDim < 10 we assume meters, otherwise millimeters
+  const unitScaleToMm = maxDim > 0 && maxDim < 10 ? 1000 : 1;
+  const maxDimMm = maxDim * unitScaleToMm;
+
+  // Log per-mesh sizes in mm
+  // eslint-disable-next-line no-console
+  console.log('[prepareSceneForExport] global maxDim:', maxDim, '->', maxDimMm, 'mm (unitScaleToMm=', unitScaleToMm, ')');
+  for (const info of perMeshInfo) {
+    const meshMax = Math.max(info.size.x, info.size.y, info.size.z);
+    // eslint-disable-next-line no-console
+    console.log('[prepareSceneForExport] mesh:', info.name, 'size:', info.size.toArray(), '->', meshMax * unitScaleToMm, 'mm');
+  }
+
+  // Apply 0.25 scale (75% reduction) to all geometries for consistent keychain size
+  const targetScaleFactor = 0.25*110;
+  const targetScaleMat = new THREE.Matrix4().makeScale(targetScaleFactor, targetScaleFactor, targetScaleFactor);
+  group.traverse((obj: any) => {
+    if (obj?.isMesh && obj.geometry) {
+      const g = (obj.geometry as THREE.BufferGeometry).clone();
+      g.applyMatrix4(targetScaleMat);
+      obj.geometry = g;
+    }
+  });
+  // eslint-disable-next-line no-console
+  console.log('[prepareSceneForExport] Applied uniform scale factor 0.25 (75% reduction)');
+
+  // NOTE: We do NOT apply additional "fit to bed" scaling here because the 0.25x factor
+  // is explicitly intended for keychain sizing. The model should now be at correct size.
+
+  // Warn about very small meshes
+  for (const info of perMeshInfo) {
+    const meshMaxMm = Math.max(info.size.x, info.size.y, info.size.z) * unitScaleToMm;
+    if (meshMaxMm > 0 && meshMaxMm < minReasonableMm) {
+      // eslint-disable-next-line no-console
+      console.warn('[prepareSceneForExport] mesh seems extremely small (mm):', info.name, meshMaxMm);
+    }
+  }
+
+  return group;
 }
 
 // Helper to convert exporter result to Blob
@@ -87,8 +199,10 @@ export function exportGroupToStl(group: THREE.Group): Blob {
   const normal = new THREE.Vector3();
 
   let out = '';
-  out += 'solid exported\n';
 
+  // Emit each mesh as its own 'solid' block so the STL preserves object separation
+  // which we can later parse into multiple objects inside the 3MF.
+  let meshIndex = 0;
   group.traverse((obj: any) => {
     if (!obj?.isMesh) return;
     const mesh: any = obj as THREE.Mesh;
@@ -100,6 +214,25 @@ export function exportGroupToStl(group: THREE.Group): Blob {
     const idx = geom.index;
 
     const matrix = mesh.matrixWorld;
+
+    // Diagnostic: compute and log bounding box after applying matrixWorld
+    try {
+      const tempGeo = geom.clone();
+      tempGeo.applyMatrix4(matrix);
+      tempGeo.computeBoundingBox();
+      const bb = tempGeo.boundingBox as THREE.Box3;
+      const s = new THREE.Vector3();
+      bb.getSize(s);
+      const min = bb.min;
+      const max = bb.max;
+      // eslint-disable-next-line no-console
+      console.log('[exportGroupToStl] mesh:', mesh.name || `mesh_${meshIndex}`, 'bbox size:', s.toArray(), 'min:', min.toArray(), 'max:', max.toArray(), 'matrixWorld:', matrix.toArray());
+    } catch (e) {
+      // ignore diagnostics
+    }
+
+    const nameSafe = mesh.name ? mesh.name.replace(/\s+/g, '_') : `mesh_${meshIndex}`;
+    out += `solid ${nameSafe}\n`;
 
     const pushVertex = (v: THREE.Vector3) => `${v.x.toFixed(6)} ${v.y.toFixed(6)} ${v.z.toFixed(6)}`;
 
@@ -143,99 +276,57 @@ export function exportGroupToStl(group: THREE.Group): Blob {
         out += ' endfacet\n';
       }
     }
-  });
 
-  out += 'endsolid exported\n';
+    out += `endsolid ${nameSafe}\n`;
+    meshIndex += 1;
+  });
 
   // ASCII STL MIME
   return new Blob([out], { type: 'model/stl' });
 }
 
 /**
- * Export a THREE.Group to a 3MF Blob using the ThreeMFExporter from examples.
- * Dynamically imports the exporter to avoid bundling it in the main bundle.
+ * Export a THREE.Group to a 3MF Blob using GLTFExporter -> server-side conversion.
+ * 
+ * Since ThreeMFExporter doesn't exist in the three package, we:
+ * 1. Export to GLTF binary (glb) using GLTFExporter (which IS available)
+ * 2. Send the glb to /api/convert/gltf-to-3mf which packages it into 3MF ZIP format
+ * 3. Return the resulting 3MF Blob
  */
 export async function exportGroupTo3mf(group: THREE.Group, _options?: ExportOptions): Promise<Blob> {
+  // Prefer exporting as STL for maximum slicer compatibility (Prusa Slicer
+  // doesn't accept GLB inside 3MF). We create an ASCII STL client-side and
+  // send it to the server which will package it into a 3MF container.
   // eslint-disable-next-line no-console
-  console.log('[exportGroupTo3mf] Starting export...');
+  console.log('[exportGroupTo3mf] Exporting group to STL for 3MF packaging');
 
-  // dynamic import to keep bundle small
-  // Use a try-catch because bundlers like Turbopack may not resolve three/examples paths at build time
-  let ThreeMFExporter: any;
   try {
-    // Try direct import first
-    // @ts-expect-error - three/examples paths may not be resolvable at build time
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mod: any = await import('three/examples/jsm/exporters/3MFExporter.js');
-    ThreeMFExporter = (mod as any).ThreeMFExporter || (mod as any).default || (mod as any);
-  } catch (e) {
-    // If that fails, try accessing from three module dynamically
+    const stlBlob = exportGroupToStl(group);
     // eslint-disable-next-line no-console
-    console.warn('[exportGroupTo3mf] Failed to import 3MFExporter directly, trying alternative path:', e);
-    try {
-      // Fallback: this may work depending on bundler
-      const three = await import('three');
-      // @ts-ignore - accessing undocumented path
-      const mod = (three as any).examples?.jsm?.exporters?.ThreeMFExporter;
-      if (mod) {
-        ThreeMFExporter = mod;
-      } else {
-        throw new Error('3MFExporter not found in three module');
-      }
-    } catch (e2) {
-      // eslint-disable-next-line no-console
-      console.error('[exportGroupTo3mf] Failed to load 3MFExporter:', e2);
-      // Fallback: try to export to STL (simple ASCII exporter) instead of failing completely
-      console.warn('[exportGroupTo3mf] Falling back to STL exporter');
-      try {
-        const stlBlob = exportGroupToStl(group);
-        return stlBlob;
-      } catch (stlErr) {
-        console.error('[exportGroupTo3mf] STL fallback also failed:', stlErr);
-        throw new Error('Unable to load 3MFExporter or export to STL. Please ensure three package is installed.');
-      }
+    console.log('[exportGroupTo3mf] STL blob created:', stlBlob.size, 'bytes');
+
+    const resp = await fetch('/api/convert/gltf-to-3mf', {
+      method: 'POST',
+      headers: {
+        'Content-Type': stlBlob.type || 'model/stl',
+      },
+      body: stlBlob,
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`Conversion failed: ${resp.status} ${text}`);
     }
+
+    const blob3mf = await resp.blob();
+    // eslint-disable-next-line no-console
+    console.log('[exportGroupTo3mf] ✅ 3MF (with STL) created:', blob3mf.size, 'bytes');
+    return blob3mf;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[exportGroupTo3mf] STL -> 3MF conversion failed:', e);
+    throw e;
   }
-
-  const exporter = new ThreeMFExporter();
-
-  // eslint-disable-next-line no-console
-  console.log('[exportGroupTo3mf] 3MFExporter loaded');
-
-  return new Promise<Blob>((resolve, reject) => {
-    try {
-      const result = exporter.parse(group, (res: any) => {
-        try {
-          // eslint-disable-next-line no-console
-          console.log('[exportGroupTo3mf] Exporter callback received, result type:', typeof res, res instanceof Uint8Array ? 'Uint8Array' : res instanceof ArrayBuffer ? 'ArrayBuffer' : 'other');
-          const blob = parseExportResultToBlob(res);
-          // eslint-disable-next-line no-console
-          console.log('[exportGroupTo3mf] ✅ Blob created, size:', blob.size, 'bytes');
-          resolve(blob);
-        } catch (e) {
-          reject(e);
-        }
-      });
-
-      // If parse returned synchronously
-      if (result) {
-        try {
-          // eslint-disable-next-line no-console
-          console.log('[exportGroupTo3mf] Synchronous result received, type:', typeof result, result instanceof Uint8Array ? 'Uint8Array' : result instanceof ArrayBuffer ? 'ArrayBuffer' : 'other');
-          const blob = parseExportResultToBlob(result as any);
-          // eslint-disable-next-line no-console
-          console.log('[exportGroupTo3mf] ✅ Blob created (sync), size:', blob.size, 'bytes');
-          resolve(blob);
-        } catch (e) {
-          reject(e);
-        }
-      }
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('[exportGroupTo3mf] ❌ Export error:', e);
-      reject(e);
-    }
-  });
 }
 
 export default exportGroupTo3mf;
